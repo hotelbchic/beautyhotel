@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台北中山區飯店房價比較 | 峻美精品旅店</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;background:#f5f7fa;color:#1a1a2e;}
+
+  /* HEADER */
+  .header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.3);}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#e94560,#f5a623);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .logo-text{color:#fff;font-size:18px;font-weight:700;letter-spacing:1px;}
+  .header-tag{background:rgba(229,69,96,.2);color:#e94560;border:1px solid #e94560;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;}
+
+  /* HERO */
+  .hero{background:linear-gradient(135deg,#e94560 0%,#c62a47 40%,#f5a623 100%);padding:44px 32px 52px;text-align:center;position:relative;overflow:hidden;}
+  .hero-badge{display:inline-block;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:16px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}
+  .hero h1{color:#fff;font-size:26px;font-size:clamp(22px,4vw,38px);font-weight:900;letter-spacing:2px;margin-bottom:10px;}
+  .hero p{color:rgba(255,255,255,.85);font-size:15px;margin-bottom:28px;}
+  .hero-stats{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;}
+  .hero-stat{background:rgba(255,255,255,.15);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:12px 22px;color:#fff;}
+  .hero-stat .num{font-size:24px;font-weight:900;}
+  .hero-stat .label{font-size:11px;opacity:.8;margin-top:2px;}
+
+  /* NAV TABS */
+  .tabs-sticky{background:#fff;position:-webkit-sticky;position:sticky;top:60px;z-index:90;box-shadow:0 2px 8px rgba(0,0,0,.04);border-bottom:2px solid #eef0f8;}
+  .tabs{display:flex;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tab{padding:14px 24px;font-size:14px;font-weight:600;color:#999;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .2s;}
+  .tab:hover{color:#e94560;}
+  .tab.active{color:#e94560;border-bottom-color:#e94560;}
+
+  /* SECTION */
+  .section{max-width:1100px;margin:0 auto;padding:28px 20px;}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+  .section-title{font-size:19px;font-weight:800;color:#1a1a2e;margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+  .section-title span{background:linear-gradient(135deg,#e94560,#f5a623);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+
+  /* SPOTLIGHT */
+  .spotlight{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);border-radius:20px;padding:26px;margin-bottom:32px;border:2px solid #e94560;position:relative;overflow:hidden;box-shadow:0 8px 40px rgba(233,69,96,.25);}
+  .own-badge{position:absolute;top:0;right:24px;background:linear-gradient(135deg,#e94560,#f5a623);color:#fff;font-size:11px;font-weight:800;padding:6px 16px 10px;border-radius:0 0 12px 12px;letter-spacing:1px;}
+  .hotel-info h2{color:#fff;font-size:21px;font-weight:800;}
+  .hotel-info .sub{color:rgba(255,255,255,.55);font-size:12px;margin-top:4px;}
+  .platform-prices{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:18px;}
+  .platform-card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px 16px;position:relative;transition:transform .2s;}
+  .platform-card.best{border-color:#f5a623;background:rgba(245,166,35,.1);}
+  .platform-card.best::after{content:'最低 🏆';position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#f5a623;color:#1a1a2e;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .platform-name{color:rgba(255,255,255,.5);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+  .platform-price{color:#fff;font-size:24px;font-weight:900;}
+  .platform-price .currency{font-size:13px;opacity:.7;}
+  .price-input{background:transparent;border:none;color:#fff;font-size:24px;font-weight:900;width:110px;cursor:pointer;}
+  .price-input:focus{outline:none;border-bottom:2px solid #e94560;}
+  .platform-note{color:rgba(255,255,255,.4);font-size:11px;margin-top:3px;}
+
+  /* INSIGHTS */
+  .insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:32px;}
+  .insight-card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 4px 16px rgba(0,0,0,.06);border-top:4px solid;}
+  .insight-card:nth-child(1){border-color:#e94560;}
+  .insight-card:nth-child(2){border-color:#f5a623;}
+  .insight-card:nth-child(3){border-color:#27ae60;}
+  .insight-card:nth-child(4){border-color:#3498db;}
+  .insight-label{font-size:11px;color:#999;font-weight:600;margin-bottom:6px;}
+  .insight-value{font-size:22px;font-weight:900;color:#1a1a2e;}
+  .insight-sub{font-size:11px;color:#666;margin-top:5px;}
+
+  /* TABLE */
+  .table-wrap{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);margin-bottom:32px;}
+  .table-header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .table-header h3{color:#fff;font-size:16px;font-weight:700;}
+  .sort-btns{display:flex;gap:8px;flex-wrap:wrap;}
+  .sort-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;transition:all .2s;font-family:inherit;}
+  .sort-btn:hover,.sort-btn.active{background:#e94560;border-color:#e94560;color:#fff;}
+  table{width:100%;border-collapse:collapse;}
+  thead th{background:#f8f9ff;padding:12px 14px;font-size:11px;font-weight:700;color:#666;text-align:center;border-bottom:2px solid #eef0f8;text-transform:uppercase;letter-spacing:.5px;}
+  thead th:first-child{text-align:left;}
+  tbody tr{border-bottom:1px solid #f0f2f8;transition:background .15s;}
+  tbody tr:hover{background:#fef9ff;}
+  tbody tr.own-row{background:linear-gradient(90deg,#fff5f7,#fffaf5);}
+  tbody tr.own-row td:first-child{border-left:4px solid #e94560;}
+  td{padding:12px 14px;font-size:13px;text-align:center;vertical-align:middle;}
+  td:first-child{text-align:left;}
+  .hotel-name-cell{display:flex;align-items:center;gap:8px;}
+  .hotel-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .hotel-name-text strong{font-size:13px;font-weight:700;display:block;}
+  .hotel-name-text small{color:#999;font-size:11px;}
+  .own-tag{background:linear-gradient(135deg,#e94560,#f5a623);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:5px;}
+  .price-cell{font-size:14px;font-weight:700;color:#1a1a2e;}
+  .price-cell.lowest{color:#e94560;}
+  .price-cell input{border:1px dashed #ddd;border-radius:6px;padding:4px 6px;width:82px;font-size:13px;font-weight:700;text-align:center;color:#1a1a2e;font-family:inherit;background:#fafafa;cursor:pointer;}
+  .price-cell input:focus{outline:none;border-color:#e94560;background:#fff;}
+  .min-badge{display:inline-block;background:#e94560;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;margin-left:4px;}
+  .diff-cell{font-size:12px;font-weight:600;}
+  .diff-cell.lower{color:#27ae60;}
+  .diff-cell.higher{color:#e94560;}
+  .diff-cell.same{color:#999;}
+
+  /* 30-DAY SECTION */
+  .chart-wrap{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.08);margin-bottom:28px;}
+  .chart-wrap h3{font-size:16px;font-weight:800;margin-bottom:6px;color:#1a1a2e;}
+  .chart-wrap p{font-size:12px;color:#999;margin-bottom:18px;}
+  .chart-container{position:relative;height:320px;}
+
+  /* TOGGLE HOTELS */
+  .hotel-toggles{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+  .hotel-toggle{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:2px solid;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;user-select:none;}
+  .hotel-toggle.off{opacity:.35;filter:grayscale(1);}
+  .toggle-dot{width:10px;height:10px;border-radius:50%;}
+
+  /* 30-DAY TABLE */
+  .thirty-table-wrap{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.07);margin-bottom:28px;}
+  .thirty-table-wrap table{width:100%;}
+  .thirty-table-wrap thead th{background:#f8f9ff;padding:10px 10px;font-size:11px;font-weight:700;color:#555;border-bottom:2px solid #eef0f8;white-space:nowrap;}
+  .thirty-table-wrap tbody td{padding:8px 10px;font-size:12px;border-bottom:1px solid #f3f4f8;text-align:center;}
+  .thirty-table-wrap tbody td:first-child{text-align:left;font-weight:600;white-space:nowrap;}
+  .thirty-table-wrap tbody tr.weekend td{background:#fff8f0;}
+  .thirty-table-wrap tbody tr.weekend td:first-child::after{content:' 🏷';font-size:10px;}
+  .price-editable{border:1px dashed #ddd;border-radius:4px;padding:3px 5px;width:68px;font-size:12px;font-weight:600;text-align:center;color:#1a1a2e;font-family:inherit;background:transparent;cursor:pointer;}
+  .price-editable:focus{outline:none;border-color:#e94560;background:#fff;}
+  .price-editable.own-input{color:#e94560;font-weight:800;}
+  td.cell-lowest{background:rgba(233,69,96,.08);color:#e94560;font-weight:800;}
+  td.cell-own{background:rgba(233,69,96,.05);}
+
+  /* NOTICE */
+  .update-notice{background:#fffbf0;border:1px solid #f5a623;border-radius:12px;padding:12px 16px;margin-bottom:24px;display:flex;align-items:center;gap:10px;font-size:13px;color:#7a5500;}
+
+  footer{background:#1a1a2e;color:rgba(255,255,255,.4);text-align:center;padding:22px;font-size:12px;margin-top:40px;}
+
+  @media(max-width:640px){
+    .header{padding:12px 16px;}
+    .tabs-sticky{top:58px;}
+    .hero{padding:30px 14px 38px;}
+    .section{padding:16px 10px;}
+    .tab{padding:12px 14px;font-size:13px;}
+    table{font-size:12px;}
+    td,thead th{padding:9px 6px;}
+    /* Prevent iOS zoom on input focus — must be >=16px */
+    input[type=number]{font-size:16px!important;}
+    .price-input{font-size:20px!important;width:90px;}
+    .platform-prices{grid-template-columns:repeat(2,1fr);}
+    .hero-stats{gap:10px;}
+    .hero-stat{padding:10px 14px;}
+    .insights{grid-template-columns:repeat(2,1fr);}
+    .insight-value{font-size:18px;}
+    .thirty-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🏨</div>
+    <div class="logo-text">中山區房價雷達</div>
+  </div>
+  <div class="header-tag">即時比價</div>
+</div>
+
+<div class="hero">
+  <div class="hero-badge">📍 台北市中山區 · OTA 平台比價</div>
+  <h1>台北中山區飯店<br>房價即時比較</h1>
+  <p>Agoda &nbsp;·&nbsp; Trip.com &nbsp;·&nbsp; Booking.com 三平台一次掌握</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num">3</div><div class="label">訂房平台</div></div>
+    <div class="hero-stat"><div class="num">9</div><div class="label">比較飯店</div></div>
+    <div class="hero-stat"><div class="num">30</div><div class="label">天價格走勢</div></div>
+    <div class="hero-stat"><div class="num" id="updateTime">—</div><div class="label">最後更新</div></div>
+  </div>
+</div>
+
+<div class="tabs-sticky">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('today')">📊 今日比價</div>
+    <div class="tab" onclick="switchTab('trend')">📈 30天走勢圖</div>
+    <div class="tab" onclick="switchTab('calendar')">📅 30天日曆價格表</div>
+  </div>
+</div>
+
+<!-- TAB 1: 今日比價 -->
+<div class="tab-content active" id="tab-today">
+<div class="section">
+  <div class="update-notice">⚡ <strong>使用說明：</strong>點擊任意房價數字可直接修改，系統自動重新計算。建議每日比對各平台後手動更新。</div>
+
+  <div class="section-title"><span>⭐ 我們的飯店</span> 峻美精品旅店</div>
+  <div class="spotlight">
+    <div class="own-badge">🏠 我們的飯店</div>
+    <div class="hotel-info" style="margin-bottom:4px;">
+      <h2>峻美精品旅店</h2>
+      <div class="sub">📍 台北市中山區長春路62號 &nbsp;|&nbsp; 智能無人旅店 &nbsp;|&nbsp; 捷運中山/雙連站步行可達</div>
+    </div>
+    <div class="platform-prices">
+      <div class="platform-card" id="own-agoda">
+        <div class="platform-name">Agoda</div>
+        <div class="platform-price"><span class="currency">NT$</span><input class="price-input" type="number" value="2992" onchange="updateAll()" id="p_own_agoda"></div>
+        <div class="platform-note">含稅費</div>
+      </div>
+      <div class="platform-card" id="own-trip">
+        <div class="platform-name">Trip.com</div>
+        <div class="platform-price"><span class="currency">NT$</span><input class="price-input" type="number" value="3000" onchange="updateAll()" id="p_own_trip"></div>
+        <div class="platform-note">含稅費</div>
+      </div>
+      <div class="platform-card" id="own-booking">
+        <div class="platform-name">Booking.com</div>
+        <div class="platform-price"><span class="currency">NT$</span><input class="price-input" type="number" value="3410" onchange="updateAll()" id="p_own_booking"></div>
+        <div class="platform-note">含稅費</div>
+      </div>
+      <div class="platform-card" style="border:1px solid rgba(255,255,255,.15);">
+        <div class="platform-name">🏆 我們最低</div>
+        <div class="platform-price" id="own_min_display" style="color:#f5a623;">—</div>
+        <div class="platform-note" id="own_min_platform">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title"><span>📊 市場分析</span></div>
+  <div class="insights">
+    <div class="insight-card"><div class="insight-label">我們最低房價</div><div class="insight-value" id="ins_own_min">—</div><div class="insight-sub" id="ins_own_platform">—</div></div>
+    <div class="insight-card"><div class="insight-label">市場平均房價</div><div class="insight-value" id="ins_market_avg">—</div><div class="insight-sub">9家飯店均價</div></div>
+    <div class="insight-card"><div class="insight-label">我們 vs 市場均價</div><div class="insight-value" id="ins_vs_market">—</div><div class="insight-sub" id="ins_vs_desc">—</div></div>
+    <div class="insight-card"><div class="insight-label">中山區今日最低</div><div class="insight-value" id="ins_lowest">—</div><div class="insight-sub" id="ins_lowest_hotel">—</div></div>
+  </div>
+
+  <div class="section-title"><span>🏙 周邊競爭飯店</span> 房價比較</div>
+  <div class="table-wrap">
+    <div class="table-header">
+      <h3>台北中山區 · 9間飯店比價</h3>
+      <div class="sort-btns">
+        <button class="sort-btn active" onclick="sortTable('name',this)">飯店名稱</button>
+        <button class="sort-btn" onclick="sortTable('agoda',this)">Agoda 最低</button>
+        <button class="sort-btn" onclick="sortTable('min',this)">今日最低</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table id="hotelTable"><thead><tr>
+        <th style="min-width:160px;">飯店名稱</th>
+        <th>Agoda (NT$)</th><th>Trip.com (NT$)</th><th>Booking.com (NT$)</th>
+        <th>今日最低</th><th>vs 我們</th>
+      </tr></thead><tbody id="tableBody"></tbody></table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- TAB 2: 30天走勢圖 -->
+<div class="tab-content" id="tab-trend">
+<div class="section">
+  <div class="chart-wrap">
+    <h3>📈 未來30天房價走勢</h3>
+    <p>顯示各飯店三平台均價走勢（點擊飯店名稱可顯示/隱藏）</p>
+    <div class="hotel-toggles" id="toggles"></div>
+    <div class="chart-container"><canvas id="trendChart"></canvas></div>
+  </div>
+  <div class="update-notice">💡 <strong>如何更新：</strong>切換到「30天日曆價格表」分頁，直接在表格中輸入各日期的房價，走勢圖會自動更新。</div>
+</div>
+</div>
+
+<!-- TAB 3: 30天日曆價格表 -->
+<div class="tab-content" id="tab-calendar">
+<div class="section">
+  <div class="update-notice">📝 <strong>填寫說明：</strong>紅色框格為峻美自家，橘色背景為週末。直接點擊格子修改數字，走勢圖即時更新。</div>
+  <div class="thirty-table-wrap">
+    <div style="overflow-x:auto;">
+      <table id="thirtyTable">
+        <thead><tr id="thirtyHead"></tr></thead>
+        <tbody id="thirtyBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<footer>© 2026 台北中山區飯店房價比較工具 &nbsp;|&nbsp; 峻美精品旅店自用版 &nbsp;|&nbsp; 資料每日手動更新，僅供內部參考</footer>
+
+<script>
+// ===== 資料 =====
+const hotels = [
+  {id:'own',      name:'峻美精品旅店',      own:true,  color:'#e94560', loc:'中山區長春路',   agoda:2992, trip:3000,  booking:3410},
+  {id:'bchic',    name:'昇美精品旅店',      own:false, color:'#e67e22', loc:'中山區新生北路', agoda:3352, trip:4957,  booking:3872},
+  {id:'qiancai',  name:'千彩格精品旅店',    own:false, color:'#f39c12', loc:'中山區林森北路', agoda:2139, trip:2769,  booking:2471},
+  {id:'roumei',   name:'柔美商務飯店',      own:false, color:'#8e44ad', loc:'中山區建國北路', agoda:3917, trip:5888,  booking:null},
+  {id:'shemei',   name:'碩美精品旅店',      own:false, color:'#2980b9', loc:'中山區中山北路', agoda:3083, trip:8370,  booking:4557},
+  {id:'zhenmei',  name:'甄美精品商旅',      own:false, color:'#27ae60', loc:'中山區林森北路', agoda:3343, trip:10500, booking:null},
+  {id:'tianjin',  name:'天津大酒店',        own:false, color:'#16a085', loc:'中山區天津街',   agoda:null, trip:null,  booking:null},
+  {id:'yunfu',    name:'雲富大飯店',        own:false, color:'#7f8c8d', loc:'中山區長春路',   agoda:null, trip:null,  booking:null},
+  {id:'apt35',    name:'35號公寓',          own:false, color:'#e91e8c', loc:'中山區中山北路', agoda:null, trip:null,  booking:null},
+  {id:'bstay',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:null, trip:null,  booking:null},
+];
+
+// 30天資料: priceData[hotelId][dayIndex] = avg price
+const priceData = {};
+const today = new Date();
+const dates = Array.from({length:30},(_,i)=>{
+  const d = new Date(today); d.setDate(today.getDate()+i); return d;
+});
+
+function isWeekend(d){ return d.getDay()===0||d.getDay()===6; }
+function fmtDate(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
+function fmtDay(d){ return ['日','一','二','三','四','五','六'][d.getDay()]; }
+
+// Generate sample 30-day prices with weekend uplift
+function genSample(base, variance=0.1){
+  return dates.map(d=>{
+    const wkup = isWeekend(d) ? 1.2 : 1;
+    const noise = 1 + (Math.random()-0.5)*variance;
+    return base ? Math.round(base * wkup * noise / 50)*50 : null;
+  });
+}
+
+hotels.forEach(h=>{
+  const base = h.agoda ? Math.round((h.agoda+(h.trip||h.agoda)+(h.booking||h.agoda))/3) : null;
+  priceData[h.id] = genSample(base);
+});
+
+// Track hidden datasets
+const hiddenHotels = new Set();
+
+// ===== TODAY TAB =====
+function getMin(h){
+  const v=[h.agoda,h.trip,h.booking].filter(x=>x!==null&&x>0);
+  return v.length?Math.min(...v):null;
+}
+function getMinPlatform(h){
+  const min=getMin(h); if(!min)return'—';
+  if(h.agoda===min)return'Agoda';
+  if(h.trip===min)return'Trip.com';
+  return'Booking.com';
+}
+function renderTable(){
+  const tbody=document.getElementById('tableBody'); tbody.innerHTML='';
+  hotels.forEach(h=>{
+    const own=hotels[0]; const ownMin=getMin(own); const hMin=getMin(h);
+    const allMins=hotels.filter(x=>!x.own).map(getMin).filter(Boolean);
+    const isMarketLowest=!h.own&&hMin!==null&&hMin===Math.min(...allMins);
+    const diff=(!h.own&&hMin!==null&&ownMin!==null)?hMin-ownMin:null;
+    const diffHtml=diff===null?'<span class="diff-cell same">—</span>'
+      :diff>0?`<span class="diff-cell lower">+NT$${diff}</span>`
+      :diff<0?`<span class="diff-cell higher">−NT$${Math.abs(diff)}</span>`
+      :'<span class="diff-cell same">持平</span>';
+    const pc=(id,val)=>`<td class="price-cell">
+      <input type="number" value="${val!==null?val:''}" placeholder="填入"
+        onchange="updateHotel('${h.id}','${id}',this.value)"
+        style="border:1px dashed #ddd;border-radius:6px;padding:3�x 6px;width:80px;font-size:13px;font-weight:700;text-align:center;color:#1a1a2e;font-family:inherit;background:#fafafa;cursor:pointer;">
+      ${val!==null&&val===hMin?'<span class="min-badge">最低</span>':''}
+    </td>`;
+    const row=document.createElement('tr');
+    if(h.own)row.classList.add('own-row');
+    row.innerHTML=`
+      <td><div class="hotel-name-cell">
+        <div class="hotel-dot" style="background:${h.color}"></div>
+        <div class="hotel-name-text">
+          <strong>${h.name}${h.own?'<span class="own-tag">我們</span>':''}</strong>
+          <small>${h.loc}</small>
+        </div>
+      </div></td>
+      ${pc('agoda',h.agoda)}${pc('trip',h.trip)}${pc('booking',h.booking)}
+      <td class="price-cell" style="font-weight:800;color:${isMarketLowest?'#e94560':'#1a1a2e'}">
+        ${hMin?`NT$ ${hMin.toLocaleString()}`:'—'}
+        ${isMarketLowest?'<span class="min-badge">中山最低</span>':''}
+      </td>
+      <td>${diffHtml}</td>`;
+    tbody.appendChild(row);
+  });
+}
+function updateInsights(){
+  const own=hotels[0]; const ownMin=getMin(own); const ownPlatform=getMinPlatform(own);
+  const allMins=hotels.map(getMin).filter(Boolean);
+  const marketAvg=Math.round(allMins.reduce((a,b)=>a+b,0)/allMins.length);
+  const minH=hotels.reduce((best,h)=>{ const m=getMin(h); if(!m)return best; return(!best||m<getMin(best))?h:best; },null);
+  document.getElementById('ins_own_min').textContent=ownMin?`NT$ ${ownMin.toLocaleString()}`:'—';
+  document.getElementById('ins_own_platform').textContent=ownMin?`來自 ${ownPlatform}`:'—';
+  document.getElementById('ins_market_avg').textContent=`NT$ ${marketAvg.toLocaleString()}`;
+  if(ownMin){
+    const d=ownMin-marketAvg;
+    document.getElementById('ins_vs_market').textContent=`${d>0?'↑':'↓'} NT$ ${Math.abs(d).toLocaleString()}`;
+    document.getElementById('ins_vs_desc').textContent=d>0?'高於市場均價':d<0?'低於市場均價 👍':'與市場均價持平';
+  }
+  if(minH){ document.getElementById('ins_lowest').textContent=`NT$ ${getMin(minH).toLocaleString()}`; document.getElementById('ins_lowest_hotel').textContent=minH.name; }
+  document.getElementById('own_min_display').textContent=ownMin?`NT$ ${ownMin.toLocaleString()}`:'—';
+  document.getElementById('own_min_platform').textContent=`最低來自 ${ownPlatform}`;
+  ['own-agoda','own-trip','own-booking'].forEach(id=>document.getElementById(id).classList.remove('best'));
+  if(ownPlatform==='Agoda')document.getElementById('own-agoda').classList.add('best');
+  else if(ownPlatform==='Trip.com')document.getElementById('own-trip').classList.add('best');
+  else document.getElementById('own-booking').classList.add('best');
+}
+function updateAll(){
+  hotels[0].agoda=parseInt(document.getElementById('p_own_agoda').value)||null;
+  hotels[0].trip=parseInt(document.getElementById('p_own_trip').value)||null;
+  hotels[0].booking=parseInt(document.getElementById('p_own_booking').value)||null;
+  renderTable(); updateInsights(); setUpdateTime();
+}
+function updateHotel(id,field,val){
+  const h=hotels.find(x=>x.id===id); if(h)h[field]=parseInt(val)||null;
+  renderTable(); updateInsights(); setUpdateTime();
+}
+function sortTable(by,btn){
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  if(by==='name')hotels.sort((a,b)=>a.own?-1:b.own?1:a.name.localeCompare(b.name,'zh-TW'));
+  else if(by==='agoda')hotels.sort((a,b)=>a.own?-1:b.own?1:(a.agoda||9999)-(b.agoda||9999));
+  else hotels.sort((a,b)=>a.own?-1:b.own?1:(getMin(a)||9999)-(getMin(b)||9999));
+  renderTable();
+}
+
+// ===== CHART =====
+let trendChart=null;
+function buildToggles(){
+  const wrap=document.getElementById('toggles'); wrap.innerHTML='';
+  hotels.forEach(h=>{
+    const el=document.createElement('div');
+    el.className='hotel-toggle';
+    el.style.borderColor=h.color; el.style.color=h.color;
+    el.innerHTML<`<div class="toggle-dot" style="background:${h.color}"></div>${h.name}`;
+    el.onclick=()=>{ if(hiddenHotels.has(h.id)){hiddenHotels.delete(h.id);el.classList.remove('off');}else{hiddenHotels.add(h.id);el.classList.add('off');} updateChart(); };
+    wrap.appendChild(el);
+  });
+}
+function buildChart(){
+  const ctx=document.getElementById('trendChart').getContext('2d');
+  const labels=dates.map(d=>`${fmtDate(d)}(${fmtDay(d)})`);
+  const datasets=hotels.map(h=>({
+    label:h.name,
+    data:priceData[h.id],
+    borderColor:h.color,
+    backgroundColor:h.color+'22',
+    borderWidth:h.own?3:1.5,
+    pointRadius:h.own?4:2,
+    tension:.35,
+    hidden:hiddenHotels.has(h.id),
+  }));
+  trendChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: NT$ ${ctx.parsed.y?.toLocaleString()||'—'}`}}},
+    scales:{
+      x:{ticks:{font:{size:10},maxRotation:45,color:'#666'},grid:{color:'#f0f2f8'}},
+      y:{ticks:{callback:v=>`NT$${v.toLocaleString()}`,font:{size:11},color:'#666'},grid:{color:'pf0f2f8'}},
+    }
+  }});
+}
+function updateChart(){
+  if(!trendChart)return;
+  trendChart.data.datasets.forEach((ds,i)=>{
+    ds.data=priceData[hotels[i].id];
+    ds.hidden=hiddenHotels.has(hotels[i].id);
+  });
+  trendChart.update();
+}
+
+// ===== 30-DAY TABLE =====
+function buildThirtyTable(){
+  const head=document.getElementById('thirtyHead');
+  const body=document.getElementById('thirtyBody');
+  head.innerHTML=''; body.innerHTML='';
+
+  // header: date columns
+  const th0=document.createElement('th'); th0.textContent='飯店 / 日期'; th0.style.minWidth='120px'; head.appendChild(th0);
+  dates.forEach(d=>{
+    const th=document.createElement('th');
+    th.innerHTML=`${fmtDate(d)}<br><span style="color:${isWeekend(d)?'#e94560':'#aaa'};font-size:10px;">${fmtDay(d)}</span>`;
+    th.style.minWidth='68px';
+    if(isWeekend(d))th.style.background='#fff3ec';
+    head.appendChild(th);
+  });
+
+  // rows: one per hotel
+  hotels.forEach(h=>{
+    const tr=document.createElement('tr');
+    if(isWeekend(dates[0]))tr.classList.add('weekend');
+    const td0=document.createElement('td');
+    td0.innerHTML=`<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:${h.color};display:inline-block;"></span>${h.name}${h.own?'<span style="background:#e94560;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:800;">我們</span>':''}</span>`;
+    td0.style.fontWeight='600'; td0.style.whiteSpace='nowrap';
+    tr.appendChild(td0);
+    dates.forEach((d,i)=>{
+      const td=document.createElement('td');
+      if(isWeekend(d))td.style.background='#fff8f0';
+      const inp=document.createElement('input');
+      inp.className='price-editable'+(h.own?' own-input':'');
+      inp.type='number';
+      inp.value=priceData[h.id][i]||'';
+      inp.placeholder='—';
+      if(h.own)inp.style.border='1px solid #e9456066';
+      inp.onchange=()=>{ priceData[h.id][i]=parseInt(inp.value)||null; updateChart(); highlightCalendarLowest(); };
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  highlightCalendarLowest();
+}
+
+function highlightCalendarLowest(){
+  const rows=document.querySelectorAll('#thirtyBody tr');
+  const numDates=dates.length;
+  for(let col=0;col<numDates;col++){
+    let minVal=Infinity; let minRow=-1;
+    rows.forEach((tr,ri)=>{
+      const inp=tr.querySelectorAll('input')[col];
+      const v=parseInt(inp?.value);
+      if(v&&v<minVal){minVal=v;minRow=ri;}
+    });
+    rows.forEach((tr,ri)=>{
+      const td=tr.querySelectorAll('td')[col+1];
+      if(!td)return;
+      td.classList.toggle('cell-lowest',ri===minRow&&minVal<Infinity);
+    });
+  }
+}
+
+// ===== TABS =====
+function switchTab(name){
+  document.querySelectorAll('.ta
