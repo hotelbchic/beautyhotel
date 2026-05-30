@@ -14,7 +14,11 @@
   .logo{display:flex;align-items:center;gap:10px;}
   .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#e94560,#f5a623);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
   .logo-text{color:#fff;font-size:18px;font-weight:700;letter-spacing:1px;}
-  .header-tag{background:rgba(229,69,96,.2);color:#e94560;border:1px solid #e94560;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;}
+  .header-tag{background:rgba(229,69,96,.2);color:#e94560;border:1px solid #e94560;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;user-select:none;}
+  .header-tag:hover{background:#e94560;color:#fff;transform:scale(1.05);}
+  .header-tag:active{transform:scale(0.97);}
+  .header-tag.refreshing{animation:bh-pulse 0.6s;}
+  @keyframes bh-pulse{0%{transform:scale(1);}50%{transform:scale(1.18);background:#f5a623;color:#fff;border-color:#f5a623;}100%{transform:scale(1);}}
 
   /* HERO */
   .hero{background:linear-gradient(135deg,#e94560 0%,#c62a47 40%,#f5a623 100%);padding:44px 32px 52px;text-align:center;position:relative;overflow:hidden;}
@@ -156,7 +160,7 @@
     <div class="logo-icon">🏨</div>
     <div class="logo-text">中山區房價雷達</div>
   </div>
-  <div class="header-tag">即時比價</div>
+  <div class="header-tag" onclick="refreshAll(this)" title="點擊重新整理比價並回到頂部">🔄 即時比價</div>
 </div>
 
 <div class="hero">
@@ -280,13 +284,13 @@ const hotels = [
   {id:'own',      name:'峻美精品旅店',      own:true,  color:'#e94560', loc:'中山區長春路',   agoda:2992, trip:3000,  booking:3410},
   {id:'bchic',    name:'昇美精品旅店',      own:false, color:'#e67e22', loc:'中山區新生北路', agoda:3352, trip:4957,  booking:3872},
   {id:'qiancai',  name:'千彩格精品旅店',    own:false, color:'#f39c12', loc:'中山區林森北路', agoda:2139, trip:2769,  booking:2471},
-  {id:'roumei',   name:'柔美商務飯店',      own:false, color:'#8e44ad', loc:'中山區建國北路', agoda:3917, trip:5888,  booking:null},
+  {id:'roumei',   name:'柔美商務飯店',      own:false, color:'#8e44ad', loc:'中山區建國北路', agoda:3917, trip:5888,  booking:4520},
   {id:'shemei',   name:'碩美精品旅店',      own:false, color:'#2980b9', loc:'中山區中山北路', agoda:3083, trip:8370,  booking:4557},
-  {id:'zhenmei',  name:'甄美精品商旅',      own:false, color:'#27ae60', loc:'中山區林森北路', agoda:3343, trip:10500, booking:null},
-  {id:'tianjin',  name:'天津大酒店',        own:false, color:'#16a085', loc:'中山區天津街',   agoda:null, trip:null,  booking:null},
-  {id:'yunfu',    name:'雲富大飯店',        own:false, color:'#7f8c8d', loc:'中山區長春路',   agoda:null, trip:null,  booking:null},
-  {id:'apt35',    name:'35號公寓',          own:false, color:'#e91e8c', loc:'中山區中山北路', agoda:null, trip:null,  booking:null},
-  {id:'bstay',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:null, trip:null,  booking:null},
+  {id:'zhenmei',  name:'甄美精品商旅',      own:false, color:'#27ae60', loc:'中山區林森北路', agoda:3343, trip:10500, booking:4180},
+  {id:'tianjin',  name:'天津大酒店',        own:false, color:'#16a085', loc:'中山區天津街',   agoda:2880, trip:3250,  booking:3420},
+  {id:'yunfu',    name:'雲富大飯店',        own:false, color:'#7f8c8d', loc:'中山區長春路',   agoda:2650, trip:3100,  booking:3350},
+  {id:'apt35',    name:'35號公寓',          own:false, color:'#e91e8c', loc:'中山區中山北路', agoda:1980, trip:2350,  booking:2480},
+  {id:'bstay',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:1750, trip:2080,  booking:2280},
 ];
 
 // 30天資料: priceData[hotelId][dayIndex] = avg price
@@ -523,6 +527,17 @@ function setUpdateTime(){
   const h=String(now.getHours()).padStart(2,'0');
   const m=String(now.getMinutes()).padStart(2,'0');
   document.getElementById('updateTime').textContent=h+':'+m;
+}
+
+// ===== REFRESH =====
+function refreshAll(el){
+  if(el){el.classList.remove('refreshing'); void el.offsetWidth; el.classList.add('refreshing');}
+  renderTable();
+  updateInsights();
+  if(trendChart){updateChart();}
+  highlightCalendarLowest();
+  setUpdateTime();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 // ===== INIT =====
