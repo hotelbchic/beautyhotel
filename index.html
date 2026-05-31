@@ -14,7 +14,11 @@
   .logo{display:flex;align-items:center;gap:10px;}
   .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#e94560,#f5a623);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
   .logo-text{color:#fff;font-size:18px;font-weight:700;letter-spacing:1px;}
-  .header-tag{background:rgba(229,69,96,.2);color:#e94560;border:1px solid #e94560;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;}
+  .header-tag{background:rgba(229,69,96,.2);color:#e94560;border:1px solid #e94560;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;user-select:none;}
+  .header-tag:hover{background:#e94560;color:#fff;transform:scale(1.05);}
+  .header-tag:active{transform:scale(0.97);}
+  .header-tag.refreshing{animation:bh-pulse 0.6s;}
+  @keyframes bh-pulse{0%{transform:scale(1);}50%{transform:scale(1.18);background:#f5a623;color:#fff;border-color:#f5a623;}100%{transform:scale(1);}}
 
   /* HERO */
   .hero{background:linear-gradient(135deg,#e94560 0%,#c62a47 40%,#f5a623 100%);padding:44px 32px 52px;text-align:center;position:relative;overflow:hidden;}
@@ -156,7 +160,10 @@
     <div class="logo-icon">🏨</div>
     <div class="logo-text">中山區房價雷達</div>
   </div>
-  <div class="header-tag">即時比價</div>
+  <div style="display:flex;gap:6px;align-items:center;">
+    <div class="header-tag" onclick="refreshAll(this)" title="點擊重新整理比價並回到頂部">🔄 即時比價</div>
+    <div class="header-tag" onclick="clearState()" title="清除已儲存的房價" style="background:transparent;color:rgba(255,255,255,.55);border-color:rgba(255,255,255,.25);">🗑</div>
+  </div>
 </div>
 
 <div class="hero">
@@ -182,7 +189,7 @@
 <!-- TAB 1: 今日比價 -->
 <div class="tab-content active" id="tab-today">
 <div class="section">
-  <div class="update-notice">⚡ <strong>使用說明：</strong>點擊任意房價數字可直接修改，系統自動重新計算。建議每日比對各平台後手動更新。</div>
+  <div class="update-notice">⚡ <strong>使用說明：</strong>每間飯店旁的「🔗 即時比價」按鈕會打開 Google Travel 顯示 Agoda/Trip/Booking 三平台即時房價，看完直接點下方欄位輸入即可。所有編輯會自動存到瀏覽器，重新整理不會消失。</div>
 
   <div class="section-title"><span>⭐ 我們的飯店</span> 峻美精品旅店</div>
   <div class="spotlight">
@@ -340,9 +347,9 @@ function renderTable(){
       :diff<0?`<span class="diff-cell higher">−NT$${Math.abs(diff)}</span>`
       :'<span class="diff-cell same">持平</span>';
     const pc=(id,val)=>`<td class="price-cell">
-      <input type="number" value="${val!==null?val:''}" placeholder="填入"
+      <input type="number" value="${val!==null?val:''}" placeholder="點此輸入"
         onchange="updateHotel('${h.id}','${id}',this.value)"
-        style="border:1px dashed #ddd;border-radius:6px;padding:3px 6px;width:80px;font-size:13px;font-weight:700;text-align:center;color:#1a1a2e;font-family:inherit;background:#fafafa;cursor:pointer;">
+        style="border:${val===null?'2px dashed #e94560':'1px dashed #ddd'};border-radius:6px;padding:5px 6px;width:88px;font-size:13px;font-weight:700;text-align:center;color:#1a1a2e;font-family:inherit;background:${val===null?'#fff5f7':'#fafafa'};cursor:pointer;">
       ${val!==null&&val===hMin?'<span class="min-badge">最低</span>':''}
     </td>`;
     const row=document.createElement('tr');
@@ -352,7 +359,7 @@ function renderTable(){
         <div class="hotel-dot" style="background:${h.color}"></div>
         <div class="hotel-name-text">
           <strong>${h.name}${h.own?'<span class="own-tag">我們</span>':''}</strong>
-          <small>${h.loc}</small>
+          <small>${h.loc} <a href="https://www.google.com/travel/search?q=${encodeURIComponent(h.name+' 台北 中山區')}&hl=zh-TW&gl=tw" target="_blank" rel="noopener" title="到 Google 比價看即時 3 OTA 房價" style="margin-left:6px;padding:1px 6px;background:#e94560;color:#fff;border-radius:8px;font-size:10px;text-decoration:none;font-weight:700;">🔗 即時比價</a></small>
         </div>
       </div></td>
       ${pc('agoda',h.agoda)}${pc('trip',h.trip)}${pc('booking',h.booking)}
@@ -412,7 +419,7 @@ function buildToggles(){
     const el=document.createElement('div');
     el.className='hotel-toggle';
     el.style.borderColor=h.color; el.style.color=h.color;
-    el.innerHTML<`<div class="toggle-dot" style="background:${h.color}"></div>${h.name}`;
+    el.innerHTML=`<div class="toggle-dot" style="background:${h.color}"></div>${h.name}`;
     el.onclick=()=>{ if(hiddenHotels.has(h.id)){hiddenHotels.delete(h.id);el.classList.remove('off');}else{hiddenHotels.add(h.id);el.classList.add('off');} updateChart(); };
     wrap.appendChild(el);
   });
@@ -524,7 +531,73 @@ function setUpdateTime(){
   document.getElementById('updateTime').textContent=`${n.getMonth()+1}/${n.getDate()} ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
 }
 
+// ===== REFRESH BUTTON =====
+function refreshAll(el){
+  if(el){el.classList.remove('refreshing'); void el.offsetWidth; el.classList.add('refreshing');}
+  renderTable();
+  updateInsights();
+  if(trendChart)updateChart();
+  if(document.querySelector('#thirtyBody tr'))highlightCalendarLowest();
+  setUpdateTime();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ===== PERSISTENCE (localStorage) =====
+const STORAGE_KEY='bh_prices_v1';
+function saveState(){
+  try{
+    const today={};
+    hotels.forEach(h=>{today[h.id]={agoda:h.agoda,trip:h.trip,booking:h.booking};});
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({today,priceData,ts:Date.now()}));
+  }catch(e){console.warn('save failed',e);}
+}
+function loadState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY); if(!raw)return false;
+    const o=JSON.parse(raw);
+    if(o.today){
+      hotels.forEach(h=>{
+        const v=o.today[h.id]; if(!v)return;
+        h.agoda=v.agoda; h.trip=v.trip; h.booking=v.booking;
+      });
+      const a=document.getElementById('p_own_agoda');
+      const t=document.getElementById('p_own_trip');
+      const b=document.getElementById('p_own_booking');
+      if(a)a.value=hotels[0].agoda??'';
+      if(t)t.value=hotels[0].trip??'';
+      if(b)b.value=hotels[0].booking??'';
+    }
+    if(o.priceData){
+      Object.keys(o.priceData).forEach(id=>{
+        if(priceData[id]&&Array.isArray(o.priceData[id])){priceData[id]=o.priceData[id];}
+      });
+    }
+    return true;
+  }catch(e){console.warn('load failed',e); return false;}
+}
+function clearState(){
+  if(confirm('確定要清空所有已儲存的房價？')){
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+}
+// hook updateHotel & updateAll to auto-save
+const _updateHotel=updateHotel;
+updateHotel=function(id,field,val){_updateHotel(id,field,val); saveState();};
+const _updateAll=updateAll;
+updateAll=function(){_updateAll(); saveState();};
+// hook buildThirtyTable to auto-save calendar edits
+const _buildThirtyTable=buildThirtyTable;
+buildThirtyTable=function(){
+  _buildThirtyTable();
+  document.querySelectorAll('#thirtyBody input').forEach(inp=>{
+    const orig=inp.onchange;
+    inp.onchange=function(){ if(orig)orig.call(this); saveState(); };
+  });
+};
+
 // INIT
+loadState();
 renderTable(); updateInsights(); setUpdateTime();
 </script>
 </body>
