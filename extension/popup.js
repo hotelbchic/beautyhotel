@@ -77,9 +77,12 @@ async function buildSnapshot(checkin) {
     dayOfWeek = names[ci.getDay()];
     isWeekend = ci.getDay() === 5 || ci.getDay() === 6; // 五、六入住算週末
   }
+  const now = new Date();
+  const scrapeDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   return {
     schemaVersion: 1,
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: now.toISOString(),
+    scrapeDate,            // 抓這份的日期（給歷史趨勢用 x 軸）
     checkin, checkout, dayOfWeek, isWeekend,
     source: "beautyhotel-sync extension push",
     hotels,
@@ -90,22 +93,29 @@ async function buildSnapshot(checkin) {
 function utf8ToBase64(str) {
   return btoa(unescape(encodeURIComponent(str)));
 }
-async function ghPut(path, obj, message, cfg) {
+// 讀某路徑現有 JSON 內容 + sha（不存在回 {json:null}）
+async function ghGetJson(path, cfg) {
   const base = `https://api.github.com/repos/${cfg.repo}/contents/${path}`;
   const headers = { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json" };
-  // 取現有 SHA（更新時必須帶；不存在則新建）
-  let sha;
-  const getRes = await fetch(`${base}?ref=${encodeURIComponent(cfg.branch)}`, { headers });
-  if (getRes.ok) { sha = (await getRes.json()).sha; }
-  else if (getRes.status !== 404) { throw new Error(`讀取 ${path} 失敗：${getRes.status}`); }
-
-  const body = {
-    message,
-    content: utf8ToBase64(JSON.stringify(obj, null, 2)),
-    branch: cfg.branch,
-  };
+  const res = await fetch(`${base}?ref=${encodeURIComponent(cfg.branch)}`, { headers });
+  if (res.status === 404) return { json: null, sha: undefined };
+  if (!res.ok) throw new Error(`讀取 ${path} 失敗：${res.status}`);
+  const j = await res.json();
+  let json = null;
+  try { json = JSON.parse(decodeURIComponent(escape(atob(j.content)))); } catch (e) {}
+  return { json, sha: j.sha };
+}
+async function ghPut(path, obj, message, cfg, sha) {
+  const base = `https://api.github.com/repos/${cfg.repo}/contents/${path}`;
+  const headers = { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" };
+  if (sha === undefined) {
+    // 沒傳就自己查一次
+    const cur = await ghGetJson(path, cfg);
+    sha = cur.sha;
+  }
+  const body = { message, content: utf8ToBase64(JSON.stringify(obj, null, 2)), branch: cfg.branch };
   if (sha) body.sha = sha;
-  const putRes = await fetch(base, { method: "PUT", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const putRes = await fetch(base, { method: "PUT", headers, body: JSON.stringify(body) });
   if (!putRes.ok) {
     const txt = await putRes.text();
     throw new Error(`寫入 ${path} 失敗：${putRes.status} ${txt.slice(0, 120)}`);
@@ -132,10 +142,20 @@ async function doPush() {
   setStatus(st, "⏳ 正在推送 latest.json …", "info");
   try {
     const snap = await buildSnapshot(checkin);
+    const sd = snap.scrapeDate;
     await ghPut("data/latest.json", snap, `data: 更新 ${checkin} 房價 (extension)`, cfg);
+
     setStatus(st, "⏳ latest.json 完成，寫入歷史快照 …", "info");
-    // 歷史檔以「入住日」命名；同日多次推送會覆蓋為最新
-    await ghPut(`data/history/${checkin}.json`, snap, `data: 歷史快照 ${checkin} (extension)`, cfg);
+    // 歷史檔以「抓取日期」命名：每天一份，記錄「那天看到的價」→ 可看 pickup 趨勢
+    await ghPut(`data/history/${sd}.json`, snap, `data: 歷史快照 ${sd} (extension)`, cfg);
+
+    // 維護 history/index.json（檔案清單，給比價表的歷史趨勢分頁讀）
+    const idx = await ghGetJson("data/history/index.json", cfg);
+    const list = Array.isArray(idx.json) ? idx.json : [];
+    if (!list.includes(sd)) list.push(sd);
+    list.sort();
+    await ghPut("data/history/index.json", list, `data: 更新歷史索引 (${sd})`, cfg, idx.sha);
+
     setStatus(st, `✅ 推送成功！<br>GitHub Pages 約 30-60 秒後更新，手機開比價表即可看到 ${checkin} 的房價。`, "ok");
   } catch (e) {
     setStatus(st, `❌ ${e.message || e}`, "err");

@@ -183,6 +183,7 @@
     <div class="tab active" onclick="switchTab('today')">📊 今日比價</div>
     <div class="tab" onclick="switchTab('trend')">📈 30天走勢圖</div>
     <div class="tab" onclick="switchTab('calendar')">📅 30天日曆價格表</div>
+    <div class="tab" onclick="switchTab('history')">📉 歷史趨勢</div>
   </div>
 </div>
 
@@ -268,6 +269,19 @@
     <div class="chart-container"><canvas id="trendChart"></canvas></div>
   </div>
   <div class="update-notice">💡 <strong>如何更新：</strong>切換到「30天日曆價格表」分頁，直接在表格中輸入各日期的房價，走勢圖會自動更新。</div>
+</div>
+</div>
+
+<!-- TAB 4: 歷史趨勢 -->
+<div class="tab-content" id="tab-history">
+<div class="section">
+  <div class="chart-wrap">
+    <h3>📉 競品房價歷史趨勢</h3>
+    <p>每次用擴充「📤 推送到 GitHub」就會留下一筆當天快照。下圖為各飯店最低價隨「抓取日期」的變化（點圖例可顯示/隱藏）。</p>
+    <div class="hotel-toggles" id="histToggles"></div>
+    <div class="chart-container"><canvas id="histChart"></canvas></div>
+  </div>
+  <div class="update-notice" id="histNotice">⏳ 載入歷史資料中…</div>
 </div>
 </div>
 
@@ -424,6 +438,7 @@ function sortTable(by,btn){
 
 // ===== CHART =====
 let trendChart=null;
+let histChart=null;
 function buildToggles(){
   const wrap=document.getElementById('toggles'); wrap.innerHTML='';
   hotels.forEach(h=>{
@@ -529,13 +544,14 @@ function highlightCalendarLowest(){
 // ===== TABS =====
 function switchTab(name){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const names=['today','trend','calendar'];
+    const names=['today','trend','calendar','history'];
     t.classList.toggle('active',names[i]===name);
   });
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(name==='trend'&&!trendChart){buildToggles();buildChart();}
   if(name==='calendar'){buildThirtyTable();}
+  if(name==='history'&&!histChart){buildHistory();}
 }
 function setUpdateTime(){
   const n=new Date();
@@ -655,6 +671,55 @@ function updateDataNotice(data){
   const wk=data.isWeekend?'週末':'平日';
   const upd=data.lastUpdated?new Date(data.lastUpdated).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
   el.textContent=`目前顯示「${ci} ${dow}${dow&&!data.isWeekend?'（平日）':data.isWeekend?'（週末）':''}」一晚房價${upd?'｜更新於 '+upd:''}`;
+}
+
+// ===== 歷史趨勢 (data/history/*.json) =====
+async function buildHistory(){
+  const notice=document.getElementById('histNotice');
+  let dates=[];
+  try{
+    const r=await fetch('data/history/index.json?t='+Date.now(),{cache:'no-store'});
+    if(r.ok) dates=await r.json();
+  }catch(e){}
+  if(!Array.isArray(dates)||dates.length===0){
+    notice.innerHTML='📭 還沒有歷史資料。每次用擴充「📤 推送到 GitHub」就會累積一筆當天快照，幾天後這裡就會出現趨勢線。';
+    return;
+  }
+  dates=dates.slice(-30); // 最多顯示最近 30 筆
+  const snaps=await Promise.all(dates.map(async d=>{
+    try{const r=await fetch('data/history/'+d+'.json?t='+Date.now(),{cache:'no-store'});return r.ok?await r.json():null;}catch(e){return null;}
+  }));
+  const rows=dates.map((d,i)=>({date:d,snap:snaps[i]})).filter(x=>x.snap&&x.snap.hotels);
+  if(rows.length===0){notice.innerHTML='📭 歷史索引存在但讀不到快照內容。';return;}
+
+  const minOf=(o)=>{if(!o)return null;const v=[o.agoda,o.trip,o.booking].filter(x=>typeof x==='number');return v.length?Math.min(...v):null;};
+  const datasets=hotels.map(h=>{
+    const data=rows.map(r=>minOf(r.snap.hotels[h.id]));
+    if(data.every(x=>x===null))return null; // 完全沒資料的飯店不畫
+    return {
+      label:h.name+(h.own?'（我們）':''),
+      data,
+      borderColor:h.color,
+      backgroundColor:h.color,
+      borderWidth:h.own?4:2,
+      pointRadius:h.own?4:3,
+      tension:.3,
+      spanGaps:true,
+      hidden:false,
+    };
+  }).filter(Boolean);
+
+  const labels=rows.map(r=>r.date.slice(5)); // MM-DD
+  if(histChart)histChart.destroy();
+  const ctx=document.getElementById('histChart').getContext('2d');
+  histChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
+    responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
+      tooltip:{callbacks:{label:(c)=>`${c.dataset.label}: ${c.parsed.y==null?'—':'NT$ '+c.parsed.y.toLocaleString()}`}}},
+    scales:{y:{ticks:{callback:v=>'$'+v}}}
+  }});
+  const last=rows[rows.length-1];
+  notice.innerHTML=`📊 共 ${rows.length} 天快照（最新 ${last.date}，入住日 ${last.snap.checkin||'?'}）。x 軸＝抓取日期，y 軸＝該飯店當天最低 OTA 價。`;
 }
 
 // INIT
