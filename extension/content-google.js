@@ -70,8 +70,13 @@
   }
 
   function currentHotelName() {
-    const h = document.querySelector("h2, [role='heading'][aria-level='1']");
-    return (h && h.innerText.split("\n")[0]) || document.title.split(" - ")[0];
+    // Google Travel 詳細頁的 document.title 就是「開啟中的飯店名」，最可靠。
+    // （頁面上第一個 h2 往往是左側清單/廣告，會抓錯，例如「臺北車站智選假日酒店」）
+    const t = (document.title || "").replace(/\s*[-–]\s*Google.*$/, "").trim();
+    if (t && !/搜尋|住宿資訊|Google|飯店搜尋/.test(t)) return t;
+    // 還在搜尋列表頁（title 是「搜尋…的住宿資訊」）→ 回傳空，交給呼叫端判斷
+    const h = document.querySelector("[role='heading'][aria-level='1']");
+    return (h && h.innerText.split("\n")[0]) || "";
   }
 
   function extractCurrent() {
