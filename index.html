@@ -228,6 +228,7 @@
         <div class="platform-note" id="own_min_platform">—</div>
       </div>
     </div>
+    <div id="parityCheck" style="margin-top:14px;padding:10px 14px;border-radius:10px;font-size:13px;display:none;"></div>
   </div>
 
   <div class="section-title"><span>📊 市場分析</span></div>
@@ -416,6 +417,25 @@ function updateInsights(){
   if(ownPlatform==='Agoda')document.getElementById('own-agoda').classList.add('best');
   else if(ownPlatform==='Trip.com')document.getElementById('own-trip').classList.add('best');
   else document.getElementById('own-booking').classList.add('best');
+  checkParity(own);
+}
+// 自家 Rate Parity 檢查：三 OTA 應同價，價差過大代表某通路偷偷低價/設定跑掉
+function checkParity(own){
+  const box=document.getElementById('parityCheck'); if(!box)return;
+  const ch=[['Agoda',own.agoda],['Trip.com',own.trip],['Booking.com',own.booking]].filter(x=>typeof x[1]==='number');
+  if(ch.length<2){ box.style.display='none'; return; }
+  box.style.display='block';
+  const lo=ch.reduce((a,b)=>b[1]<a[1]?b:a), hi=ch.reduce((a,b)=>b[1]>a[1]?b:a);
+  const gap=hi[1]-lo[1], pct=Math.round(gap/hi[1]*100);
+  if(pct<5){
+    box.style.background='rgba(39,174,96,.18)'; box.style.color='#a8f0c8';
+    box.innerHTML=`✅ <b>Rate Parity 一致</b>：三平台價差僅 ${pct}%（$${lo[1].toLocaleString()}–$${hi[1].toLocaleString()}），通路定價同步良好。`;
+  }else{
+    box.style.background='rgba(233,69,96,.2)'; box.style.color='#ffb3c1';
+    box.innerHTML=`⚠️ <b>Rate Parity 警告：價差 ${pct}%</b>（NT$ ${gap.toLocaleString()}）<br>
+      <span style="font-size:12px;">最低 <b>${lo[0]} $${lo[1].toLocaleString()}</b>，最高 <b>${hi[0]} $${hi[1].toLocaleString()}</b>。
+      ${lo[0]} 可能在偷偷低價搶單 → 建議檢查該通路的會員價/促銷/channel manager 設定，避免侵蝕其他通路與自家官網。</span>`;
+  }
 }
 function updateAll(){
   hotels[0].agoda=parseInt(document.getElementById('p_own_agoda').value)||null;
