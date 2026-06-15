@@ -1,6 +1,8 @@
 /* eslint-disable */
-// 在 Google Travel 頁面右下角加一顆「📥 抓房價」按鈕
-// 點下去：自動抓當前 hotel + 當前查詢日期 + 3 OTA 房價，存到 chrome.storage
+// 在 Google Travel 頁面右下角加按鈕：
+//  - 📥 抓這間：抓當前開啟的飯店詳細頁 3 OTA 房價
+//  - 📥📥 批次抓全部：在區域搜尋結果頁，自動逐間點開、抓價、換下一間
+// 抓到的資料存進 chrome.storage，之後到比價表頁面匯入。
 
 (function () {
   // 順序很重要：先檢查最具體的字串
@@ -18,6 +20,8 @@
     ["apt35",   ["35apt", "35號公寓", "35號 N.APT", "N.APT 35"]], // 35號公寓
   ];
 
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
   function detectHotelId(title) {
     const t = (title || "").toLowerCase();
     for (const [id, kws] of HOTEL_KEYWORDS) {
@@ -26,20 +30,21 @@
     return null;
   }
 
-  function extractCurrent() {
-    // 飯店名: 從 <h2> 或頁面 title
-    const h = document.querySelector("h2, [role='heading'][aria-level='1']");
-    const hotelName = (h && h.innerText.split("\n")[0]) || document.title.split(" - ")[0];
-
-    // 日期: 從畫面上的 M月D日 文字抓
+  // 從畫面文字抓 M月D日 → "MM-DD"（取前兩個 = checkin/checkout）
+  function extractDates() {
     const txt = document.body.innerText;
     const dateMatches = txt.match(/(\d+)月(\d+)日週./g) || [];
-    const dates = dateMatches.slice(0, 2).map((d) => {
-      const m = d.match(/(\d+)月(\d+)日/);
-      return m ? `${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
-    }).filter(Boolean);
+    return dateMatches
+      .slice(0, 2)
+      .map((d) => {
+        const m = d.match(/(\d+)月(\d+)日/);
+        return m ? `${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
+      })
+      .filter(Boolean);
+  }
 
-    // OTA 價格: 找「造訪網站」按鈕對應 row
+  // 抓「目前詳細面板」的 3 OTA 價格
+  function extractPrices() {
     const buttons = Array.from(document.querySelectorAll("a, button")).filter((b) =>
       (b.innerText || "").includes("造訪網站")
     );
@@ -61,9 +66,129 @@
         break;
       }
     });
+    return prices;
+  }
 
-    const hotelId = detectHotelId(hotelName);
-    return { hotelId, hotelName, dates, prices };
+  function currentHotelName() {
+    const h = document.querySelector("h2, [role='heading'][aria-level='1']");
+    return (h && h.innerText.split("\n")[0]) || document.title.split(" - ")[0];
+  }
+
+  function extractCurrent() {
+    const hotelName = currentHotelName();
+    return {
+      hotelId: detectHotelId(hotelName),
+      hotelName,
+      dates: extractDates(),
+      prices: extractPrices(),
+    };
+  }
+
+  // 存一筆（同 hotel + 同 checkin 視為更新）
+  function storeEntry(d) {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(["bhScrapes"], (r) => {
+        const arr = r.bhScrapes || [];
+        const entry = {
+          hotelId: d.hotelId,
+          hotelName: d.hotelName,
+          checkin: d.dates[0] || null,
+          checkout: d.dates[1] || null,
+          prices: d.prices,
+          ts: Date.now(),
+        };
+        const key = (e) => e.hotelId + "@" + e.checkin;
+        const filtered = arr.filter((e) => key(e) !== key(entry));
+        filtered.push(entry);
+        chrome.storage.local.set({ bhScrapes: filtered }, () => resolve(filtered.length));
+      });
+    });
+  }
+
+  // ---- 批次模式 ----
+
+  // 找左側清單裡屬於我們 comp set 的飯店卡片（用 aria-label 抓最穩）
+  function findSidebarCards() {
+    const cards = [];
+    const seen = new Set();
+    const links = document.querySelectorAll("a[aria-label]");
+    links.forEach((a) => {
+      const label = a.getAttribute("aria-label") || "";
+      if (!label.includes("價格") && !label.includes("$")) return;
+      const id = detectHotelId(label);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        cards.push({ id, el: a, label });
+      }
+    });
+    return cards;
+  }
+
+  // 點開某卡片後等價格載入；會自動處理「載入結果時發生問題 → 再試一次」
+  async function waitForPrices(expectedId, timeout) {
+    const start = Date.now();
+    let retried = 0;
+    while (Date.now() - start < timeout) {
+      // 載入失敗 → 點再試一次（最多 2 次）
+      const retryBtn = Array.from(document.querySelectorAll("button, a")).find((b) =>
+        (b.innerText || "").trim() === "再試一次"
+      );
+      if (retryBtn && retried < 2) {
+        retryBtn.click();
+        retried++;
+        await sleep(2500);
+        continue;
+      }
+      const d = extractCurrent();
+      // 必須是「面板已切到正確飯店」且抓到價，才算成功
+      if (d.hotelId === expectedId && Object.keys(d.prices).length > 0) return d;
+      await sleep(500);
+    }
+    return null;
+  }
+
+  async function batchGrab(toast, counter, btn) {
+    const cards = findSidebarCards();
+    if (cards.length === 0) {
+      showToast(toast, `⚠️ 這頁找不到 comp set 飯店<br><small>請先在 Google Travel 搜尋「台北中山區飯店」或「Beauty Hotels Taipei」這類區域查詢</small>`);
+      return;
+    }
+    btn.classList.add("busy");
+    const ok = [], skip = [];
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i];
+      showToast(toast, `⏳ (${i + 1}/${cards.length}) 點開 <b>${c.id}</b>…`, true);
+      try {
+        c.el.scrollIntoView({ block: "center" });
+        c.el.click();
+      } catch (e) {}
+      const d = await waitForPrices(c.id, 12000);
+      if (d) {
+        const n = await storeEntry(d);
+        counter.textContent = n;
+        ok.push(c.id);
+        const ota = Object.entries(d.prices).map(([k, v]) => `${k} $${v}`).join(" · ");
+        showToast(toast, `✅ (${i + 1}/${cards.length}) <b>${c.id}</b> @${d.dates[0] || "?"}<br>${ota}`, true);
+      } else {
+        skip.push(c.id);
+        showToast(toast, `⚠️ (${i + 1}/${cards.length}) <b>${c.id}</b> 載入逾時，跳過`, true);
+      }
+      await sleep(800); // 對 Google 友善一點，降低被擋機率
+    }
+    btn.classList.remove("busy");
+    showToast(
+      toast,
+      `🎉 批次完成<br>成功 <b>${ok.length}</b> 間${skip.length ? `，跳過 ${skip.length} 間 (${skip.join(", ")})` : ""}<br><small>到比價表頁面按「📥 從擴充匯入」</small>`
+    );
+  }
+
+  // ---- UI ----
+
+  function showToast(toast, html, sticky) {
+    toast.innerHTML = html;
+    toast.classList.add("show");
+    clearTimeout(toast._t);
+    if (!sticky) toast._t = setTimeout(() => toast.classList.remove("show"), 6000);
   }
 
   function buildUI() {
@@ -71,8 +196,11 @@
     const root = document.createElement("div");
     root.id = "bh-grab-root";
     root.innerHTML = `
+      <button id="bh-batch-btn" type="button" class="bh-secondary">
+        <span>📥📥 批次抓全部</span>
+      </button>
       <button id="bh-grab-btn" type="button">
-        <span>📥 抓房價</span>
+        <span>📥 抓這間</span>
         <span class="bh-counter" id="bh-grab-count">0</span>
       </button>
       <div id="bh-grab-toast"></div>
@@ -80,56 +208,33 @@
     document.body.appendChild(root);
 
     const btn = root.querySelector("#bh-grab-btn");
+    const batchBtn = root.querySelector("#bh-batch-btn");
     const toast = root.querySelector("#bh-grab-toast");
     const counter = root.querySelector("#bh-grab-count");
 
     chrome.storage.local.get(["bhScrapes"], (r) => {
-      const arr = r.bhScrapes || [];
-      counter.textContent = arr.length;
+      counter.textContent = (r.bhScrapes || []).length;
     });
 
-    function showToast(html) {
-      toast.innerHTML = html;
-      toast.classList.add("show");
-      clearTimeout(toast._t);
-      toast._t = setTimeout(() => toast.classList.remove("show"), 6000);
-    }
-
-    btn.addEventListener("click", () => {
+    // 單間
+    btn.addEventListener("click", async () => {
       const d = extractCurrent();
       if (!d.hotelId) {
-        showToast(`❌ 認不出這是哪間飯店<br><small>${(d.hotelName || "").slice(0, 40)}</small>`);
+        showToast(toast, `❌ 認不出這是哪間飯店<br><small>${(d.hotelName || "").slice(0, 40)}</small>`);
         return;
       }
       if (!d.dates.length || Object.keys(d.prices).length === 0) {
-        showToast(`❌ 抓不到日期或價格，請確認頁面已載入完整 OTA 列表`);
+        showToast(toast, `❌ 抓不到日期或價格，請確認頁面已載入完整 OTA 列表`);
         return;
       }
-      chrome.storage.local.get(["bhScrapes"], (r) => {
-        const arr = r.bhScrapes || [];
-        const entry = {
-          hotelId: d.hotelId,
-          hotelName: d.hotelName,
-          checkin: d.dates[0],
-          checkout: d.dates[1] || null,
-          prices: d.prices,
-          ts: Date.now(),
-        };
-        // 同 hotel + 同 checkin 視為更新而非新增
-        const key = (e) => e.hotelId + "@" + e.checkin;
-        const filtered = arr.filter((e) => key(e) !== key(entry));
-        filtered.push(entry);
-        chrome.storage.local.set({ bhScrapes: filtered }, () => {
-          counter.textContent = filtered.length;
-          const ota = Object.entries(d.prices)
-            .map(([k, v]) => `${k} <b>$${v}</b>`)
-            .join(" · ");
-          showToast(
-            `✅ 已存 <b>${d.hotelId}</b> @${d.checkin}<br>${ota}<br><small>累計 ${filtered.length} 筆，到 beautyhotel 頁面按「📥 匯入」</small>`
-          );
-        });
-      });
+      const n = await storeEntry(d);
+      counter.textContent = n;
+      const ota = Object.entries(d.prices).map(([k, v]) => `${k} <b>$${v}</b>`).join(" · ");
+      showToast(toast, `✅ 已存 <b>${d.hotelId}</b> @${d.dates[0]}<br>${ota}<br><small>累計 ${n} 筆</small>`);
     });
+
+    // 批次
+    batchBtn.addEventListener("click", () => batchGrab(toast, counter, batchBtn));
   }
 
   // Google Travel 是 SPA, URL 變但頁面不重新載

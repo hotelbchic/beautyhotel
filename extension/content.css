@@ -23,7 +23,27 @@
 }
 #bh-grab-btn:hover, #bh-import-btn:hover { transform: scale(1.05); }
 #bh-grab-btn:active, #bh-import-btn:active { transform: scale(0.97); }
-#bh-grab-btn.busy { opacity: .7; cursor: wait; }
+#bh-grab-btn.busy, #bh-batch-btn.busy { opacity: .6; cursor: wait; }
+/* 批次按鈕：深色次要樣式，放在主按鈕上方 */
+#bh-batch-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  background: #1a1a2e;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  transition: transform .15s;
+  font-family: inherit;
+}
+#bh-batch-btn:hover { transform: scale(1.05); }
+#bh-batch-btn:active { transform: scale(0.97); }
 #bh-grab-toast, #bh-import-toast {
   margin-top: 8px;
   background: #1a1a2e;
