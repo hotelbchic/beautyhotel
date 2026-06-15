@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  body{font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;margin:0;padding:14px;width:300px;background:#1a1a2e;color:#fff;}
+  body{font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;margin:0;padding:14px;width:320px;background:#1a1a2e;color:#fff;}
   h1{font-size:14px;font-weight:800;margin-bottom:4px;}
   .sub{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:12px;}
   .stat{background:rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;margin-bottom:10px;}
@@ -11,14 +11,27 @@
   .stat .l{font-size:11px;color:rgba(255,255,255,.6);}
   button{width:100%;background:linear-gradient(135deg,#e94560,#f5a623);color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:6px;font-family:inherit;}
   button:hover{filter:brightness(1.1);}
+  button:disabled{opacity:.5;cursor:not-allowed;filter:none;}
   button.secondary{background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);}
-  .list{max-height:160px;overflow-y:auto;font-size:11px;background:rgba(0,0,0,.2);border-radius:8px;padding:6px;margin-bottom:8px;}
+  .list{max-height:130px;overflow-y:auto;font-size:11px;background:rgba(0,0,0,.2);border-radius:8px;padding:6px;margin-bottom:8px;}
   .list .row{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:6px;}
   .list .row:last-child{border-bottom:none;}
   .list .row .name{font-weight:700;color:#f5a623;}
   .list .row .date{color:rgba(255,255,255,.5);font-size:10px;}
   .empty{color:rgba(255,255,255,.4);font-style:italic;text-align:center;padding:10px;}
   .footer{font-size:10px;color:rgba(255,255,255,.4);text-align:center;margin-top:8px;}
+  details{margin-bottom:10px;background:rgba(255,255,255,.05);border-radius:8px;padding:8px 10px;}
+  summary{font-size:12px;font-weight:700;cursor:pointer;color:#f5a623;}
+  label{display:block;font-size:10px;color:rgba(255,255,255,.6);margin:8px 0 3px;}
+  input,select{width:100%;box-sizing:border-box;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:6px;padding:7px 8px;font-size:12px;font-family:inherit;}
+  .hint{font-size:9px;color:rgba(255,255,255,.4);margin-top:3px;line-height:1.4;}
+  .hint a{color:#f5a623;}
+  .status{font-size:11px;border-radius:8px;padding:8px 10px;margin-bottom:8px;display:none;}
+  .status.show{display:block;}
+  .status.ok{background:rgba(39,174,96,.2);color:#6ee7a8;}
+  .status.err{background:rgba(233,69,96,.2);color:#ff9bb0;}
+  .status.info{background:rgba(245,166,35,.15);color:#f5c97a;}
+  hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:12px 0;}
 </style>
 </head>
 <body>
@@ -34,12 +47,38 @@
     <div class="empty">尚未抓取任何資料</div>
   </div>
 
-  <button id="open-bh">→ 開啟 beautyhotel 比價表</button>
-  <button id="open-gt">→ 開啟 Google Travel</button>
-  <button id="clear" class="secondary">🗑 清空所有已抓資料</button>
+  <!-- 推送到 GitHub -->
+  <label for="pushDate">發布哪個入住日期為「最新」</label>
+  <select id="pushDate"></select>
+  <div id="pushStatus" class="status"></div>
+  <button id="push">📤 推送到 GitHub（手機也看得到）</button>
+
+  <hr>
+
+  <button id="open-bh" class="secondary">→ 開啟比價表</button>
+  <button id="open-gt" class="secondary">→ 開啟 Google Travel</button>
+  <button id="clear" class="secondary">🗑 清空已抓資料</button>
+
+  <!-- 設定 -->
+  <details id="settings">
+    <summary>⚙️ GitHub 推送設定</summary>
+    <label for="ghToken">GitHub Token (Fine-grained PAT)</label>
+    <input type="password" id="ghToken" placeholder="github_pat_..." autocomplete="off">
+    <div class="hint">
+      只授權 <b>hotelbchic/beautyhotel</b> 一個 repo 的 <b>Contents: Read and write</b>，建議設 90 天到期。<br>
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">→ 建立 Fine-grained Token</a><br>
+      Token 只存在你這台電腦的瀏覽器，不會外傳。
+    </div>
+    <label for="ghRepo">Repo</label>
+    <input type="text" id="ghRepo" value="hotelbchic/beautyhotel">
+    <label for="ghBranch">Branch</label>
+    <input type="text" id="ghBranch" value="main">
+    <button id="saveCfg" class="secondary" style="margin-top:10px;">💾 儲存設定</button>
+    <div id="cfgStatus" class="status"></div>
+  </details>
 
   <div class="footer">
-    在 Google Travel 飯店頁右下角點「📥 抓房價」收集，再到比價表頁點「📥 從擴充匯入」。
+    在 Google Travel 點「📥📥 批次抓全部」收集 → 回這裡「📤 推送到 GitHub」→ 手機開比價表就自動更新。
   </div>
 
 <script src="popup.js"></script>

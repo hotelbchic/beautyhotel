@@ -21,7 +21,8 @@
   "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": [
     "https://www.google.com/travel/*",
-    "https://hotelbchic.github.io/beautyhotel/*"
+    "https://hotelbchic.github.io/beautyhotel/*",
+    "https://api.github.com/*"
   ],
   "content_scripts": [
     {
