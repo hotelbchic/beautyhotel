@@ -30,17 +30,30 @@
     return null;
   }
 
-  // 從畫面文字抓 M月D日 → "MM-DD"（取前兩個 = checkin/checkout）
+  const toMMDD = (mo, da) => `${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
+
+  // 抓 checkin / checkout → ["MM-DD","MM-DD"]
+  // 重點：Google Travel 的日期在「日期選擇器 input 的 value」裡（例如「6月27日週六」），
+  // 而 input.value 不會出現在 document.body.innerText，所以一定要讀 input。
   function extractDates() {
-    const txt = document.body.innerText;
-    const dateMatches = txt.match(/(\d+)月(\d+)日週./g) || [];
-    return dateMatches
-      .slice(0, 2)
-      .map((d) => {
-        const m = d.match(/(\d+)月(\d+)日/);
-        return m ? `${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
-      })
-      .filter(Boolean);
+    const found = [];
+    document.querySelectorAll("input").forEach((i) => {
+      const m = (i.value || "").match(/(\d+)月(\d+)日/);
+      if (m) found.push(toMMDD(m[1], m[2]));
+    });
+    // 去重但保留順序（picker 常有重複 input），取前兩個 = checkin/checkout
+    const uniq = [...new Set(found)];
+    if (uniq.length >= 2) return uniq.slice(0, 2);
+    if (uniq.length === 1) return uniq;
+    // 後備：從日期按鈕 aria-label「6月27日至28日…」抓
+    const lbl = [...document.querySelectorAll("[aria-label]")]
+      .map((e) => e.getAttribute("aria-label") || "")
+      .find((l) => /\d+月\d+日至\d+日/.test(l));
+    if (lbl) {
+      const m = lbl.match(/(\d+)月(\d+)日至(\d+)日/);
+      if (m) return [toMMDD(m[1], m[2]), toMMDD(m[1], m[3])];
+    }
+    return [];
   }
 
   // 抓「目前詳細面板」的 3 OTA 價格
