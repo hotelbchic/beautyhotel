@@ -189,8 +189,8 @@
 <!-- TAB 1: 今日比價 -->
 <div class="tab-content active" id="tab-today">
 <div class="section">
-  <div class="update-notice" style="background:#fff0f0;border-color:#e94560;color:#a02030;font-weight:600;">
-    ⚠️ <strong>注意：目前顯示的是「2026/07/08 週三平日」一晚的房價</strong><br>
+  <div class="update-notice" id="dataNotice" style="background:#fff0f0;border-color:#e94560;color:#a02030;font-weight:600;">
+    ⚠️ <strong id="noticeDate">注意：目前顯示的是「2026/07/08 週三平日」一晚的房價</strong><br>
     <span style="font-weight:normal;font-size:12px;color:#7a2030;">
       中山區飯店週末通常比平日貴 1.5-2 倍。如果你正在比週末或當下 → 點該列「🔗 即時比價」按鈕看真實 OTA 價，或裝
       <a href="https://github.com/hotelbchic/beautyhotel/tree/main/extension" target="_blank" style="color:#e94560;font-weight:600;">beautyhotel-sync Chrome 擴充</a>
@@ -555,11 +555,16 @@ function refreshAll(el){
 
 // ===== PERSISTENCE (localStorage) =====
 const STORAGE_KEY='bh_prices_v1';
-function saveState(){
+function saveState(remoteTs){
   try{
     const today={};
     hotels.forEach(h=>{today[h.id]={agoda:h.agoda,trip:h.trip,booking:h.booking};});
-    localStorage.setItem(STORAGE_KEY,JSON.stringify({today,priceData,ts:Date.now()}));
+    // 保留先前記錄的 remoteTs（除非這次明確帶新的進來）
+    let rt=remoteTs;
+    if(rt===undefined){
+      try{const o=JSON.parse(localStorage.getItem(STORAGE_KEY));rt=o&&o.remoteTs;}catch(e){}
+    }
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({today,priceData,ts:Date.now(),remoteTs:rt||0}));
   }catch(e){console.warn('save failed',e);}
 }
 function loadState(){
@@ -607,9 +612,55 @@ buildThirtyTable=function(){
   });
 };
 
+// ===== REMOTE DATA (data/latest.json) =====
+// 從 GitHub 上的 data/latest.json 拉最新房價。任何裝置（手機/桌面）都讀同一份。
+// 規則：只有當遠端的 lastUpdated「比上次套用過的還新」才覆蓋，
+// 這樣使用者手動微調不會被同一份舊資料一直蓋回去，但擴充推上新資料時會自動更新。
+const DATA_URL='data/latest.json';
+async function loadRemote(){
+  try{
+    const res=await fetch(DATA_URL+'?t='+Date.now(),{cache:'no-store'});
+    if(!res.ok)return;
+    const data=await res.json();
+    if(!data||!data.hotels)return;
+    const remoteTs=data.lastUpdated?new Date(data.lastUpdated).getTime():0;
+    let appliedRemoteTs=0;
+    try{const o=JSON.parse(localStorage.getItem(STORAGE_KEY));appliedRemoteTs=(o&&o.remoteTs)||0;}catch(e){}
+    if(remoteTs<=appliedRemoteTs)return; // 已是這份或更舊，保留使用者目前資料
+    // 套用遠端房價
+    hotels.forEach(h=>{
+      const v=data.hotels[h.id];
+      if(!v)return;
+      h.agoda=(v.agoda??null);
+      h.trip=(v.trip??null);
+      h.booking=(v.booking??null);
+    });
+    // 同步自家飯店輸入框
+    const a=document.getElementById('p_own_agoda');
+    const t=document.getElementById('p_own_trip');
+    const b=document.getElementById('p_own_booking');
+    if(a)a.value=hotels[0].agoda??'';
+    if(t)t.value=hotels[0].trip??'';
+    if(b)b.value=hotels[0].booking??'';
+    saveState(remoteTs);           // 記下這份 remoteTs，避免重複套用
+    updateDataNotice(data);        // 更新頂部日期提示
+    renderTable(); updateInsights(); setUpdateTime();
+  }catch(e){console.warn('remote load failed',e);}
+}
+function updateDataNotice(data){
+  const el=document.getElementById('noticeDate');
+  if(!el)return;
+  const ci=data.checkin||'?';
+  const dow=data.dayOfWeek||'';
+  const wk=data.isWeekend?'週末':'平日';
+  const upd=data.lastUpdated?new Date(data.lastUpdated).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  el.textContent=`目前顯示「${ci} ${dow}${dow&&!data.isWeekend?'（平日）':data.isWeekend?'（週末）':''}」一晚房價${upd?'｜更新於 '+upd:''}`;
+}
+
 // INIT
 loadState();
 renderTable(); updateInsights(); setUpdateTime();
+loadRemote(); // 非同步：抓到更新的遠端資料會自動重繪
 </script>
 </body>
 </html>
