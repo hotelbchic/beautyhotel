@@ -293,11 +293,49 @@
     return { ok: ok1 && ok2, dates: extractDates() };
   }
 
+  // 從搜尋結果卡片的 aria-label 抓某飯店的「from 最低價」(搜尋列表頁就有，不必等詳細頁)
+  function fromPriceOf(expectedId) {
+    const kws = (HOTEL_KEYWORDS.find((k) => k[0] === expectedId) || [null, []])[1].map((s) => s.toLowerCase());
+    let lowest = null;
+    document.querySelectorAll("a[aria-label]").forEach((a) => {
+      const l = (a.getAttribute("aria-label") || "").toLowerCase();
+      const pm = l.match(/\$([\d,]+)/);
+      if (!pm) return;
+      if (kws.some((k) => l.includes(k))) {
+        const v = parseInt(pm[1].replace(/,/g, ""));
+        if (lowest === null || v < lowest) lowest = v;
+      }
+    });
+    return lowest;
+  }
+  // 給 auto-batch 用：先試詳細頁 3 OTA，否則退回搜尋卡片的 from 價；含「再試一次」重試
+  async function extractForBatch(expectedId, timeout) {
+    const start = Date.now();
+    let retried = 0;
+    while (Date.now() - start < timeout) {
+      const retryBtn = Array.from(document.querySelectorAll("button, a")).find(
+        (b) => (b.innerText || "").trim() === "再試一次"
+      );
+      if (retryBtn && retried < 2) { retryBtn.click(); retried++; await sleep(2500); continue; }
+      // (a) 詳細頁完整 3 OTA
+      const det = extractCurrent();
+      if (det.hotelId === expectedId && Object.keys(det.prices).length > 0) return det;
+      // (b) 搜尋卡片的 from 最低價
+      const from = fromPriceOf(expectedId);
+      const dates = extractDates();
+      if (from !== null && dates.length) {
+        return { hotelId: expectedId, hotelName: document.title, dates, prices: { agoda: from } };
+      }
+      await sleep(700);
+    }
+    return null;
+  }
+
   // 背景引擎(background.js)叫我抓價：等價格載入(含「再試一次」)後回傳結果
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.type === "extractNow") {
       (async () => {
-        const d = await waitForPrices(msg.expectedId, 18000);
+        const d = await extractForBatch(msg.expectedId, 16000);
         sendResponse(d || null);
       })();
       return true; // 非同步回覆，保持通道
