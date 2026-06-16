@@ -707,21 +707,25 @@ async function loadCalendar(){
     const cal=await res.json();
     if(!cal||!cal.samples||!cal.offsets)return;
     const offs=cal.offsets.map(Number);
-    // 每個 offset 是平日還是週末（用今天 dates[] 判斷）
-    const isWk=(off)=>off<dates.length?isWeekend(dates[off]):false;
+    // 高價日判斷：飯店房價的貴日是「週五、週六入住」(getDay 5/6)，不是週六日
+    const isHigh=(off)=>{ if(off>=dates.length)return false; const g=dates[off].getDay(); return g===5||g===6; };
     hotels.forEach(h=>{
       const arr=new Array(30).fill(null);
       // 先放真實取樣點
       const sampled=offs.filter(o=>cal.samples[o]&&typeof cal.samples[o][h.id]==='number');
-      if(sampled.length===0){return;} // 這間沒取樣到，維持原本
+      if(sampled.length<2){ // 取樣點太少(<2)就不硬補，避免亂填；只放有抓到的點
+        sampled.forEach(o=>{ if(o<30)arr[o]=cal.samples[o][h.id]; });
+        if(sampled.length)priceData[h.id]=arr;
+        return;
+      }
       offs.forEach(o=>{ const v=cal.samples[o]&&cal.samples[o][h.id]; if(typeof v==='number'&&o<30)arr[o]=v; });
-      // 補滿：每天找最近的「同類型」取樣點
+      // 補滿：每天找最近的「同類型(高價日/平日)」取樣點
       for(let i=0;i<30;i++){
         if(arr[i]!=null)continue;
-        const wantWk=isWk(i);
+        const wantHigh=isHigh(i);
         let best=null,bestDist=999;
-        sampled.forEach(o=>{ if(isWk(o)===wantWk){const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}} });
-        if(best===null){ sampled.forEach(o=>{const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}}); } // 退而求其次任意最近
+        sampled.forEach(o=>{ if(isHigh(o)===wantHigh){const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}} });
+        if(best===null){ sampled.forEach(o=>{const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}}); } // 同類型沒有就取最近任意
         if(best!==null)arr[i]=cal.samples[best][h.id];
       }
       priceData[h.id]=arr;
