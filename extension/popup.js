@@ -183,7 +183,44 @@ function saveCfg() {
   });
 }
 
+// ---- 一鍵全抓 + 推送 ----
+let autoPollTimer = null;
+function renderAutoStatus(s) {
+  const el = $("autoStatus");
+  if (!s) { clearStatus(el); return; }
+  const kind = s.error ? "err" : s.done ? "ok" : "info";
+  const head = s.running ? `⏳ (${s.i}/${s.total}) ` : "";
+  setStatus(el, head + (s.msg || ""), kind);
+  $("auto").disabled = !!s.running;
+}
+function startAutoPoll() {
+  if (autoPollTimer) clearInterval(autoPollTimer);
+  autoPollTimer = setInterval(() => {
+    chrome.storage.local.get(["bhAutoStatus"], (r) => {
+      renderAutoStatus(r.bhAutoStatus);
+      if (r.bhAutoStatus && r.bhAutoStatus.done) { clearInterval(autoPollTimer); autoPollTimer = null; render(); }
+    });
+  }, 1000);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  $("auto").onclick = () => {
+    if (!confirm("將自動開一個分頁，依序抓 10 間飯店（約 1.5-2 分鐘）再推送到 GitHub。\n過程中請勿關閉那個分頁。開始？")) return;
+    chrome.runtime.sendMessage({ type: "startAutoBatch" }, (resp) => {
+      if (resp && resp.started) {
+        setStatus($("autoStatus"), "⏳ 已開始，請看新開的分頁逐間跑…可關掉此視窗，跑完再開來看結果", "info");
+        $("auto").disabled = true;
+        startAutoPoll();
+      } else {
+        setStatus($("autoStatus"), "⚠️ 已經在跑了", "info");
+      }
+    });
+  };
+  // 開啟時若正在跑，接續顯示
+  chrome.storage.local.get(["bhAutoStatus"], (r) => {
+    if (r.bhAutoStatus) { renderAutoStatus(r.bhAutoStatus); if (r.bhAutoStatus.running) startAutoPoll(); }
+  });
+
   $("open-bh").onclick = () => chrome.tabs.create({ url: "https://hotelbchic.github.io/beautyhotel/" });
   $("open-gt").onclick = () => chrome.tabs.create({ url: "https://www.google.com/travel/hotels?hl=zh-TW&gl=tw" });
   $("clear").onclick = () => {

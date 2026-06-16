@@ -8,6 +8,9 @@
     const root = document.createElement("div");
     root.id = "bh-import-root";
     root.innerHTML = `
+      <button id="bh-auto-btn" type="button" style="background:linear-gradient(135deg,#27ae60,#2ecc71);margin-bottom:8px;">
+        <span>⚡ 一鍵全抓 10 間 + 更新</span>
+      </button>
       <button id="bh-import-btn" type="button">
         <span>📥 從擴充匯入</span>
         <span class="bh-counter" id="bh-import-count">0</span>
@@ -17,8 +20,35 @@
     document.body.appendChild(root);
 
     const btn = root.querySelector("#bh-import-btn");
+    const autoBtn = root.querySelector("#bh-auto-btn");
     const toast = root.querySelector("#bh-import-toast");
     const counter = root.querySelector("#bh-import-count");
+
+    // 一鍵全抓：叫背景引擎自動跑 10 間 + 推 GitHub；跑完自動重整本頁看新價
+    autoBtn.addEventListener("click", () => {
+      if (!confirm("將自動開一個分頁，依序抓 10 間飯店（約 1.5-2 分鐘）再推送到 GitHub，完成後本頁自動更新。\n過程中請勿關閉那個分頁。開始？")) return;
+      chrome.runtime.sendMessage({ type: "startAutoBatch" }, (resp) => {
+        if (resp && resp.started) showToast("⏳ 已開始，請看新開的分頁逐間跑…約 1.5-2 分鐘，完成後本頁會自動更新");
+        else showToast("⚠️ 已經在跑了");
+      });
+      pollAuto();
+    });
+    let pollTimer = null;
+    function pollAuto() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        chrome.storage.local.get(["bhAutoStatus"], (r) => {
+          const s = r.bhAutoStatus;
+          if (!s) return;
+          showToast(`${s.running ? `⏳ (${s.i}/${s.total}) ` : ""}${s.msg || ""}`);
+          if (s.done) {
+            clearInterval(pollTimer); pollTimer = null;
+            // 推送完隔幾秒，等 GitHub Pages 更新後重整本頁
+            if (!s.error) setTimeout(() => location.reload(), 6000);
+          }
+        });
+      }, 1000);
+    }
 
     function showToast(html) {
       toast.innerHTML = html;

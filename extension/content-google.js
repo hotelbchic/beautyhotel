@@ -255,6 +255,17 @@
     batchBtn.addEventListener("click", () => batchGrab(toast, counter, batchBtn));
   }
 
+  // 背景引擎(background.js)叫我抓價：等價格載入(含「再試一次」)後回傳結果
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg && msg.type === "extractNow") {
+      (async () => {
+        const d = await waitForPrices(msg.expectedId, 18000);
+        sendResponse(d || null);
+      })();
+      return true; // 非同步回覆，保持通道
+    }
+  });
+
   // Google Travel 是 SPA, URL 變但頁面不重新載
   buildUI();
   setInterval(buildUI, 2000);
