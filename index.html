@@ -591,16 +591,16 @@ function refreshAll(el){
 
 // ===== PERSISTENCE (localStorage) =====
 const STORAGE_KEY='bh_prices_v1';
-function saveState(remoteTs){
+function saveState(ver){
   try{
     const today={};
     hotels.forEach(h=>{today[h.id]={agoda:h.agoda,trip:h.trip,booking:h.booking};});
-    // 保留先前記錄的 remoteTs（除非這次明確帶新的進來）
-    let rt=remoteTs;
-    if(rt===undefined){
-      try{const o=JSON.parse(localStorage.getItem(STORAGE_KEY));rt=o&&o.remoteTs;}catch(e){}
+    // 保留先前記錄的版本號（除非這次明確帶新的進來）
+    let v=ver;
+    if(v===undefined){
+      try{const o=JSON.parse(localStorage.getItem(STORAGE_KEY));v=o&&o.ver;}catch(e){}
     }
-    localStorage.setItem(STORAGE_KEY,JSON.stringify({today,priceData,ts:Date.now(),remoteTs:rt||0}));
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({today,priceData,ts:Date.now(),ver:v||0}));
   }catch(e){console.warn('save failed',e);}
 }
 function loadState(){
@@ -650,19 +650,23 @@ buildThirtyTable=function(){
 
 // ===== REMOTE DATA (data/latest.json) =====
 // 從 GitHub 上的 data/latest.json 拉最新房價。任何裝置（手機/桌面）都讀同一份。
-// 規則：只有當遠端的 lastUpdated「比上次套用過的還新」才覆蓋，
-// 這樣使用者手動微調不會被同一份舊資料一直蓋回去，但擴充推上新資料時會自動更新。
+// 新舊判斷用獨立的 version（整數，越大越新）；沒有 version 就退回用 lastUpdated 時間。
+// 這樣 lastUpdated 可以是「真實抓取時間」純粹給人看，不會影響覆蓋邏輯。
 const DATA_URL='data/latest.json';
+function remoteVersionOf(data){
+  if(typeof data.version==='number')return data.version;
+  return data.lastUpdated?new Date(data.lastUpdated).getTime():0;
+}
 async function loadRemote(){
   try{
     const res=await fetch(DATA_URL+'?t='+Date.now(),{cache:'no-store'});
     if(!res.ok)return;
     const data=await res.json();
     if(!data||!data.hotels)return;
-    const remoteTs=data.lastUpdated?new Date(data.lastUpdated).getTime():0;
-    let appliedRemoteTs=0;
-    try{const o=JSON.parse(localStorage.getItem(STORAGE_KEY));appliedRemoteTs=(o&&o.remoteTs)||0;}catch(e){}
-    if(remoteTs<=appliedRemoteTs)return; // 已是這份或更舊，保留使用者目前資料
+    const remoteVer=remoteVersionOf(data);
+    let appliedVer=0;
+    try{const o=JSON.parse(localStorage.getItem(STORAGE_KEY));appliedVer=(o&&o.ver)||0;}catch(e){}
+    if(remoteVer<=appliedVer)return; // 已是這份或更舊，保留使用者目前資料
     // 套用遠端房價
     hotels.forEach(h=>{
       const v=data.hotels[h.id];
@@ -678,7 +682,7 @@ async function loadRemote(){
     if(a)a.value=hotels[0].agoda??'';
     if(t)t.value=hotels[0].trip??'';
     if(b)b.value=hotels[0].booking??'';
-    saveState(remoteTs);           // 記下這份 remoteTs，避免重複套用
+    saveState(remoteVer);          // 記下這份版本號，避免重複套用
     updateDataNotice(data);        // 更新頂部日期提示
     renderTable(); updateInsights(); setUpdateTime();
   }catch(e){console.warn('remote load failed',e);}
