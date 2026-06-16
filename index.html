@@ -289,7 +289,7 @@
 <!-- TAB 3: 30天日曆價格表 -->
 <div class="tab-content" id="tab-calendar">
 <div class="section">
-  <div class="update-notice">📝 <strong>填寫說明：</strong>紅色框格為峻美自家，橘色背景為週末。直接點擊格子修改數字，走勢圖即時更新。</div>
+  <div class="update-notice" style="background:#fff0f0;border-color:#e94560;color:#a02030;">⚠️ <strong>注意：這 30 天數字是「電腦推算」不是真實抓取！</strong><br><span style="font-weight:normal;font-size:12px;">以各飯店今日均價為基準，週末 ×1.2、加 ±5% 隨機波動模擬出來的，僅供版面參考。真實多日房價請用擴充逐日抓取後覆蓋。紅框=峻美自家、橘底=週末，可直接點格子改成真實數字。</span></div>
   <div class="thirty-table-wrap">
     <div style="overflow-x:auto;">
       <table id="thirtyTable">
@@ -318,8 +318,8 @@ const hotels = [
   {id:'zhenmei',  name:'甄美精品商旅',      own:false, color:'#27ae60', loc:'中山區林森北路', agoda:1171, trip:null, booking:null},
   {id:'tianjin',  name:'天津大酒店',        own:false, color:'#16a085', loc:'中山區天津街',   agoda:1310, trip:null, booking:null},
   {id:'yunfu',    name:'雲富大飯店',        own:false, color:'#7f8c8d', loc:'中山區長春路',   agoda:2000, trip:null, booking:2180},
-  {id:'apt35',    name:'35號公寓',          own:false, color:'#e91e8c', loc:'中山區中山北路', agoda:null, trip:null, booking:null},
-  {id:'bstay',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:null, trip:null, booking:null},
+  {id:'apt35',    name:'35號公寓',          own:false, color:'#e91e8c', loc:'中山區中山北路', agoda:null, trip:null, booking:null, gname:'35APT 台北'},
+  {id:'bstay',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:null, trip:null, booking:null, gname:'中山N.APT 台北'},
 ];
 
 // 30天資料: priceData[hotelId][dayIndex] = avg price
@@ -385,7 +385,7 @@ function renderTable(){
         <div class="hotel-dot" style="background:${h.color}"></div>
         <div class="hotel-name-text">
           <strong>${h.name}${h.own?'<span class="own-tag">我們</span>':''}</strong>
-          <small>${h.loc} <a href="https://www.google.com/travel/search?q=${encodeURIComponent(h.name+' 台北 中山區')}&hl=zh-TW&gl=tw" target="_blank" rel="noopener" title="到 Google 比價看即時 3 OTA 房價" style="margin-left:6px;padding:1px 6px;background:#e94560;color:#fff;border-radius:8px;font-size:10px;text-decoration:none;font-weight:700;">🔗 即時比價</a></small>
+          <small>${h.loc}${h.gname?` <span style="color:#e94560;font-size:10px;">(Google 上叫「${h.gname.replace(' 台北','')}」)</span>`:''} <a href="https://www.google.com/travel/search?q=${encodeURIComponent((h.gname||h.name+' 台北 中山區'))}&hl=zh-TW&gl=tw" target="_blank" rel="noopener" title="到 Google 比價看即時 3 OTA 房價" style="margin-left:6px;padding:1px 6px;background:#e94560;color:#fff;border-radius:8px;font-size:10px;text-decoration:none;font-weight:700;">🔗 即時比價</a></small>
         </div>
       </div></td>
       ${pc('agoda',h.agoda)}${pc('trip',h.trip)}${pc('booking',h.booking)}
