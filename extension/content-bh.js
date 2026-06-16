@@ -31,7 +31,7 @@
     // 注意：不用 confirm()（原生對話框會擋住遠端自動化），改成直接跑 + toast 提示
     function triggerAuto() {
       chrome.runtime.sendMessage({ type: "startAutoBatch" }, (resp) => {
-        if (resp && resp.started) showToast("⏳ 已開始！會自動開分頁逐間抓 10 間（約 1.5-2 分鐘），完成後本頁自動更新。請勿關閉新分頁。");
+        if (resp && resp.started) showToast("⏳ 已開始！會自動彈出一個新視窗抓今天 10 間（約 1.5-2 分鐘），跑完自動關閉視窗、本頁自動更新。");
         else showToast("⚠️ 已經在跑了");
       });
       pollAuto();
@@ -42,7 +42,7 @@
     const sampleBtn = root.querySelector("#bh-sample-btn");
     if (sampleBtn) sampleBtn.addEventListener("click", () => {
       chrome.runtime.sendMessage({ type: "startSampleScan" }, (resp) => {
-        if (resp && resp.started) showToast("⏳ 30 天取樣已開始（約 10 分鐘，抓 10 個代表日 ×10 間）…請勿關閉 Google 分頁，完成後本頁自動更新");
+        if (resp && resp.started) showToast("⏳ 30 天取樣已開始（會彈出新視窗，約 10 分鐘抓 10 代表日×10 間）…跑完自動關閉視窗、本頁自動更新");
         else showToast("⚠️ 已經在跑了");
       });
       pollAuto();

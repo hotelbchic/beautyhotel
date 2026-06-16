@@ -40,6 +40,20 @@ function dayFromOffset(baseISO, off) {
   const d = new Date(Y, M - 1, D + off);
   return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), dow: d.getDay() };
 }
+function todayISO() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+function tsForOffset(baseISO, off) {
+  const ci = dayFromOffset(baseISO, off), co = dayFromOffset(baseISO, off + 1);
+  return buildTs({ y: ci.y, m: ci.m, d: ci.d }, { y: co.y, m: co.m, d: co.d });
+}
+// 開一個新視窗來跑(不佔用使用者分頁)；跑完用 closeWindow 關掉
+async function openScanWindow() {
+  const w = await chrome.windows.create({ url: "about:blank", focused: true, width: 1100, height: 850 });
+  return { winId: w.id, tabId: w.tabs[0].id };
+}
+async function closeWindow(winId) { try { await chrome.windows.remove(winId); } catch (e) {} }
 
 // 找使用者已開好、且設好日期的 Google Travel 分頁，回傳 tabId。
 // 關鍵：日期只在「同一分頁內換搜尋」才會保留，所以要重用這個分頁、不要開新分頁。
@@ -205,25 +219,19 @@ async function runAutoBatch() {
   if (RUNNING) return;
   RUNNING = true;
   const ok = [], skip = [];
-  // 重用使用者已設好日期的 Google Travel 分頁（同分頁換搜尋 → 日期保留）
-  const tabId = await findUserTravelTab();
-  if (!tabId) {
-    await setStatus({
-      running: false, done: true, error: true, ts: Date.now(),
-      msg: "❌ 請先開一個 Google Travel 分頁、把入住日設成你要的日期(例如今天)，保持那個分頁開著，再按一次一鍵全抓。",
-    });
-    RUNNING = false;
-    return;
-  }
+  // 開新視窗、用 ts 強制設成「今天」入住，不佔用使用者分頁；跑完自動關閉
+  const baseISO = todayISO();
+  const ts = tsForOffset(baseISO, 0);
+  let win;
   try {
-    await chrome.tabs.update(tabId, { active: true });
+    win = await openScanWindow();
     for (let i = 0; i < HOTELS.length; i++) {
       const h = HOTELS[i];
-      await progress(i + 1, HOTELS.length, `搜尋 ${h.id}（沿用你分頁的日期）…`, { ok: ok.length, skip: skip.length });
-      await chrome.tabs.update(tabId, { url: gtURL(h.q) });
-      await waitTabComplete(tabId);
+      await progress(i + 1, HOTELS.length, `搜尋 ${h.id}（今天）…`, { ok: ok.length, skip: skip.length });
+      await chrome.tabs.update(win.tabId, { url: gtURL(h.q, ts) });
+      await waitTabComplete(win.tabId);
       await sleep(3000); // 給 SPA 載入價格
-      const d = await askExtract(tabId, h.id);
+      const d = await askExtract(win.tabId, h.id);
       if (d && d.hotelId && d.prices && Object.keys(d.prices).length) {
         const n = await storeScrape(d);
         ok.push(h.id);
@@ -252,7 +260,7 @@ async function runAutoBatch() {
     await setStatus({ running: false, done: true, error: true, msg: `❌ 中斷：${(e && e.message) || e}`, ts: Date.now() });
   } finally {
     RUNNING = false;
-    // 跑完留著分頁讓使用者看最後一間；不自動關，避免誤關
+    if (win) await closeWindow(win.winId); // 跑完自動關閉視窗
   }
 }
 
@@ -290,32 +298,23 @@ async function ghPutCalendar(baseISO, samples, cfg) {
 async function runSampleScan() {
   if (RUNNING) return;
   RUNNING = true;
-  const tabId = await findUserTravelTab();
-  if (!tabId) {
-    await setStatus({ running: false, done: true, error: true, ts: Date.now(),
-      msg: "❌ 請先開一個 Google Travel 分頁並保持開著，再按 30 天取樣。" });
-    RUNNING = false; return;
-  }
-  // 用使用者分頁目前的日期當 baseDate（讀第一間就知道；簡化用今天）
-  const now = new Date();
-  const baseISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const baseISO = todayISO();
   const samples = {};
   const total = SAMPLE_OFFSETS.length * HOTELS.length;
   let done = 0, okCount = 0;
+  let win;
   try {
-    await chrome.tabs.update(tabId, { active: true });
+    win = await openScanWindow(); // 開新視窗跑，跑完自動關
     for (const off of SAMPLE_OFFSETS) {
-      const ci = dayFromOffset(baseISO, off);
-      const co = dayFromOffset(baseISO, off + 1);
-      const ts = buildTs({ y: ci.y, m: ci.m, d: ci.d }, { y: co.y, m: co.m, d: co.d });
+      const ts = tsForOffset(baseISO, off);
       samples[off] = {};
       for (const h of HOTELS) {
         done++;
         await progress(done, total, `第 +${off} 天 · ${h.id}`, { ok: okCount });
-        await chrome.tabs.update(tabId, { url: gtURL(h.q, ts) });
-        await waitTabComplete(tabId);
+        await chrome.tabs.update(win.tabId, { url: gtURL(h.q, ts) });
+        await waitTabComplete(win.tabId);
         await sleep(2500);
-        const d = await askExtract(tabId, h.id);
+        const d = await askExtract(win.tabId, h.id);
         if (d && d.prices && Object.keys(d.prices).length) {
           const v = Math.min(...Object.values(d.prices).filter((x) => typeof x === "number"));
           samples[off][h.id] = v;
@@ -337,6 +336,7 @@ async function runSampleScan() {
     await setStatus({ running: false, done: true, error: true, msg: `❌ 中斷：${(e && e.message) || e}`, ts: Date.now() });
   } finally {
     RUNNING = false;
+    if (win) await closeWindow(win.winId); // 跑完自動關閉視窗
   }
 }
 
