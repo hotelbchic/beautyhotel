@@ -205,7 +205,6 @@ function startAutoPoll() {
 
 document.addEventListener("DOMContentLoaded", () => {
   $("auto").onclick = () => {
-    if (!confirm("將自動開一個分頁，依序抓 10 間飯店（約 1.5-2 分鐘）再推送到 GitHub。\n過程中請勿關閉那個分頁。開始？")) return;
     chrome.runtime.sendMessage({ type: "startAutoBatch" }, (resp) => {
       if (resp && resp.started) {
         setStatus($("autoStatus"), "⏳ 已開始，請看新開的分頁逐間跑…可關掉此視窗，跑完再開來看結果", "info");
