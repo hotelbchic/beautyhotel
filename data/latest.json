@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "lastUpdated": "2026-07-08T18:00:00+08:00",
-  "checkin": "2026-07-08",
-  "checkout": "2026-07-09",
-  "dayOfWeek": "週三",
+  "lastUpdated": "2026-07-09T08:00:00+08:00",
+  "checkin": "2026-06-16",
+  "checkout": "2026-06-17",
+  "dayOfWeek": "週二",
   "isWeekend": false,
-  "source": "Claude Google Travel scrape (initial seed)",
-  "note": "前 4 間是完整 3 OTA 真實價，其餘只有 from 最低聚合價放在 agoda 欄。35APT/中山N.APT 由 Google 手動補上 (apt35 from 581、napt Agoda 726)，完整 3 OTA 之後用擴充抓。",
+  "source": "Claude + 使用者 Google Travel 同分頁逐間抓 (今天 6/16 入住一晚)",
+  "note": "今天(2026-06-16 週二平日)各飯店的最低房價(from 聚合價，放在 agoda 欄顯示)。透過使用者設好今天日期的 Google Travel 分頁、同分頁逐間搜尋抓取，日期一致。lastUpdated 用較大值僅為讓各裝置覆蓋舊快取。",
   "hotels": {
-    "own":     { "agoda": 1400, "trip": 1109, "booking": 1440 },
-    "bchic":   { "agoda": 1063, "trip": null, "booking": null },
-    "qiancai": { "agoda": 1150, "trip": null, "booking": 1204 },
-    "roumei":  { "agoda": 1739, "trip": null, "booking": null },
-    "shemei":  { "agoda": 1020, "trip": 1052, "booking": 1560 },
-    "zhenmei": { "agoda": 1171, "trip": null, "booking": null },
-    "tianjin": { "agoda": 1310, "trip": null, "booking": null },
-    "yunfu":   { "agoda": 2000, "trip": null, "booking": 2180 },
-    "apt35":   { "agoda": 581,  "trip": null, "booking": null },
-    "napt":    { "agoda": 726,  "trip": null, "booking": null }
+    "own":     { "agoda": 1084, "trip": null, "booking": null },
+    "bchic":   { "agoda": 1205, "trip": null, "booking": null },
+    "qiancai": { "agoda": 1022, "trip": null, "booking": null },
+    "roumei":  { "agoda": 1596, "trip": null, "booking": null },
+    "shemei":  { "agoda": 916,  "trip": null, "booking": null },
+    "zhenmei": { "agoda": 1059, "trip": null, "booking": null },
+    "tianjin": { "agoda": 1242, "trip": null, "booking": null },
+    "yunfu":   { "agoda": 1601, "trip": null, "booking": null },
+    "apt35":   { "agoda": 711,  "trip": null, "booking": null },
+    "napt":    { "agoda": 799,  "trip": null, "booking": null }
   }
 }
