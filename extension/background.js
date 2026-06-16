@@ -19,7 +19,22 @@ const HOTELS = [
 const ALL_IDS = HOTELS.map((h) => h.id);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const gtURL = (q) => `https://www.google.com/travel/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=tw`;
+const gtURL = (q, ts) =>
+  `https://www.google.com/travel/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=tw` +
+  (ts ? `&ts=${ts}` : "");
+
+// 從使用者已開的 Google Travel 分頁網址，撈出日期參數 ts（使用者設好今天後就在裡面）
+function findUserDateTs() {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ url: "*://www.google.com/travel/*" }, (tabs) => {
+      for (const t of tabs || []) {
+        const m = (t.url || "").match(/[?&]ts=([^&]+)/);
+        if (m) return resolve(m[1]);
+      }
+      resolve(null);
+    });
+  });
+}
 
 let RUNNING = false;
 
@@ -176,26 +191,25 @@ async function runAutoBatch() {
   RUNNING = true;
   const ok = [], skip = [];
   let tabId;
+  // 先撈使用者已設好的日期（從現有 Google Travel 分頁網址的 ts 參數）
+  const userTs = await findUserDateTs();
+  if (!userTs) {
+    await setStatus({
+      running: false, done: true, error: true, ts: Date.now(),
+      msg: "❌ 找不到日期。請先開一個 Google Travel 分頁、搜「台北中山區飯店」並把入住日設成今天，保持那個分頁開著，再按一次一鍵全抓。",
+    });
+    RUNNING = false;
+    return;
+  }
   try {
     const tab = await chrome.tabs.create({ url: "about:blank", active: true });
     tabId = tab.id;
     for (let i = 0; i < HOTELS.length; i++) {
       const h = HOTELS[i];
-      await progress(i + 1, HOTELS.length, `開啟 ${h.id}…`, { ok: ok.length, skip: skip.length });
-      await chrome.tabs.update(tabId, { url: gtURL(h.q) });
+      await progress(i + 1, HOTELS.length, `開啟 ${h.id}（沿用你設的日期）…`, { ok: ok.length, skip: skip.length });
+      await chrome.tabs.update(tabId, { url: gtURL(h.q, userTs) });
       await waitTabComplete(tabId);
       await sleep(2500); // 給 SPA 一點時間
-      // 第一間：自動把日期設成今天，之後同 session 會沿用
-      if (i === 0) {
-        await progress(1, HOTELS.length, "設定日期為今天…", { ok: 0, skip: 0 });
-        const sd = await askSetDate(tabId);
-        await sleep(2500); // 等價格依新日期重載
-        if (sd && sd.ok && sd.dates && sd.dates[0]) {
-          await progress(1, HOTELS.length, `日期已設今天 (${sd.dates[0]})`, { ok: 0, skip: 0 });
-        } else {
-          await progress(1, HOTELS.length, "⚠️ 自動設日期失敗，沿用 Google 預設日期", { ok: 0, skip: 0 });
-        }
-      }
       const d = await askExtract(tabId, h.id);
       if (d && d.hotelId && d.prices && Object.keys(d.prices).length) {
         const n = await storeScrape(d);
