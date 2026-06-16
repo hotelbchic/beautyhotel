@@ -2,7 +2,7 @@
 // popup：顯示已抓資料、儲存 GitHub 設定、把抓到的房價推送到 repo 的 data/latest.json
 // + data/history/<入住日>.json（給 Phase D 歷史趨勢用）。
 
-const ALL_IDS = ["own","bchic","qiancai","roumei","shemei","zhenmei","tianjin","yunfu","apt35","bstay"];
+const ALL_IDS = ["own","bchic","qiancai","roumei","shemei","zhenmei","tianjin","yunfu","apt35","napt"];
 const CFG_KEY = "bhConfig";
 
 const $ = (id) => document.getElementById(id);

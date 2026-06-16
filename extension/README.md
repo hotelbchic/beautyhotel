@@ -26,7 +26,7 @@ Google Travel 搜「台北中山區飯店」
 
 也可以用「📥 抓這間」只抓當前開啟的單一飯店。
 
-- 自動辨識的飯店 id: own / bchic / qiancai / roumei / shemei / zhenmei / tianjin / yunfu / apt35 / bstay
+- 自動辨識的飯店 id: own / bchic / qiancai / roumei / shemei / zhenmei / tianjin / yunfu / apt35 / napt
 - 同 hotel + 同 check-in 重複抓會「更新」不會新增
 
 ### 2. 推送到 GitHub（手機也看得到）

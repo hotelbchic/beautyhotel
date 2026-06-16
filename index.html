@@ -309,7 +309,7 @@ const hotels = [
   // 房價來源: Google Travel 即時抓取 (查詢日 2026-07-08 週三入住、07-09 退房 1 晚 2 人)
   // 有完整 3 OTA breakdown 的: own / shemei / qiancai / yunfu
   // 只有最低聚合價的 (放在 agoda 欄): bchic / roumei / zhenmei / tianjin
-  // Google Travel 找不到的: apt35 / bstay (中山北棧) — 用 🔗 比價按鈕手動查
+  // Google Travel 找不到的: apt35 / napt (中山北棧) — 用 🔗 比價按鈕手動查
   {id:'own',      name:'峻美精品旅店',      own:true,  color:'#e94560', loc:'中山區長春路',   agoda:1400, trip:1109, booking:1440},
   {id:'bchic',    name:'昇美精品旅店',      own:false, color:'#e67e22', loc:'中山區新生北路', agoda:1063, trip:null, booking:null},
   {id:'qiancai',  name:'千彩格精品旅店',    own:false, color:'#f39c12', loc:'中山區林森北路', agoda:1150, trip:null, booking:1204},
@@ -319,7 +319,7 @@ const hotels = [
   {id:'tianjin',  name:'天津大酒店',        own:false, color:'#16a085', loc:'中山區天津街',   agoda:1310, trip:null, booking:null},
   {id:'yunfu',    name:'雲富大飯店',        own:false, color:'#7f8c8d', loc:'中山區長春路',   agoda:2000, trip:null, booking:2180},
   {id:'apt35',    name:'35號公寓',          own:false, color:'#e91e8c', loc:'中山區中山北路', agoda:null, trip:null, booking:null, gname:'35APT 台北'},
-  {id:'bstay',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:null, trip:null, booking:null, gname:'中山N.APT 台北'},
+  {id:'napt',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:null, trip:null, booking:null, gname:'中山N.APT 台北'},
 ];
 
 // 30天資料: priceData[hotelId][dayIndex] = avg price

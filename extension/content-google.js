@@ -6,7 +6,7 @@
 
 (function () {
   // 順序很重要：先檢查最具體的字串
-  // 注意 apt35 與 bstay 兩間都屬於 N.APT 品牌，必須用「中山」/「35」前綴去區分
+  // 注意 apt35 與 napt 兩間都屬於 N.APT 品牌，必須用「中山」/「35」前綴去區分
   const HOTEL_KEYWORDS = [
     ["own",     ["峻美", "Bnight"]],
     ["bchic",   ["昇美", "Bchic"]],
@@ -16,7 +16,7 @@
     ["zhenmei", ["甄美"]],
     ["tianjin", ["天津", "Vagus"]],
     ["yunfu",   ["雲富", "Hotel Cloud", "YUN FU"]],
-    ["bstay",   ["中山N.APT", "中山 N.APT", "中山北棧"]], // 中山北棧 (Google 叫「中山N.APT」)
+    ["napt",   ["中山N.APT", "中山 N.APT", "中山北棧"]], // 中山北棧 (Google 叫「中山N.APT」)
     ["apt35",   ["35apt", "35號公寓", "35號 N.APT", "N.APT 35"]], // 35號公寓
   ];
 
