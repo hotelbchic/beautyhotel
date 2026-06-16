@@ -255,6 +255,44 @@
     batchBtn.addEventListener("click", () => batchGrab(toast, counter, batchBtn));
   }
 
+  // ---- 自動把日期設成今天 (auto-batch 開頭呼叫一次，之後同 session 會沿用) ----
+  function clickDayCell(date) {
+    const target = `${date.getMonth() + 1}月${date.getDate()}日`;
+    const cands = document.querySelectorAll('[role="gridcell"], [aria-label]');
+    for (const c of cands) {
+      const lbl = c.getAttribute("aria-label") || "";
+      if (lbl.includes(target) && !/已停用|disabled/i.test(lbl)) {
+        const btn = c.querySelector('[role="button"], button, div[jsaction]') || c;
+        btn.click();
+        return true;
+      }
+    }
+    return false;
+  }
+  async function setDatesToToday() {
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 86400000);
+    // 點開入住日期選擇器
+    const opener =
+      [...document.querySelectorAll("[aria-label]")].find((e) =>
+        /登機報到頁面|入住|報到/.test(e.getAttribute("aria-label") || "")
+      ) || [...document.querySelectorAll("input")].find((i) => /\d+月\d+日/.test(i.value || ""));
+    if (!opener) return { ok: false, reason: "找不到日期欄" };
+    opener.click();
+    await sleep(1000);
+    const ok1 = clickDayCell(today);
+    await sleep(600);
+    const ok2 = clickDayCell(tomorrow);
+    await sleep(600);
+    // 按「完成」
+    const done = [...document.querySelectorAll("button, [role='button']")].find((b) =>
+      /完成|套用|done|apply/i.test((b.innerText || "") + " " + (b.getAttribute("aria-label") || ""))
+    );
+    if (done) done.click();
+    await sleep(1800);
+    return { ok: ok1 && ok2, dates: extractDates() };
+  }
+
   // 背景引擎(background.js)叫我抓價：等價格載入(含「再試一次」)後回傳結果
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.type === "extractNow") {
@@ -263,6 +301,10 @@
         sendResponse(d || null);
       })();
       return true; // 非同步回覆，保持通道
+    }
+    if (msg && msg.type === "setDateToday") {
+      (async () => sendResponse(await setDatesToToday()))();
+      return true;
     }
   });
 

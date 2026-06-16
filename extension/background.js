@@ -72,14 +72,13 @@ function waitTabComplete(tabId, timeout = 30000) {
   });
 }
 
-// ---- 叫 content-google 抓價（content 內部會等價格載入 + 處理「再試一次」）----
-function askExtract(tabId, expectedId, tries = 10) {
+// ---- 叫 content-google 做事（抓價 / 設日期）；content 還沒注入好會重試 ----
+function askContent(tabId, payload, tries = 10) {
   return new Promise((resolve) => {
     let n = 0;
     function attempt() {
-      chrome.tabs.sendMessage(tabId, { type: "extractNow", expectedId }, (resp) => {
+      chrome.tabs.sendMessage(tabId, payload, (resp) => {
         if (chrome.runtime.lastError) {
-          // content script 還沒注入好，稍後再試
           if (n++ < tries) setTimeout(attempt, 1500);
           else resolve(null);
           return;
@@ -90,6 +89,8 @@ function askExtract(tabId, expectedId, tries = 10) {
     attempt();
   });
 }
+const askExtract = (tabId, expectedId) => askContent(tabId, { type: "extractNow", expectedId });
+const askSetDate = (tabId) => askContent(tabId, { type: "setDateToday" });
 
 // ---- GitHub 推送（service worker 版，與 popup 邏輯一致）----
 function utf8ToBase64(str) {
@@ -184,6 +185,17 @@ async function runAutoBatch() {
       await chrome.tabs.update(tabId, { url: gtURL(h.q) });
       await waitTabComplete(tabId);
       await sleep(2500); // 給 SPA 一點時間
+      // 第一間：自動把日期設成今天，之後同 session 會沿用
+      if (i === 0) {
+        await progress(1, HOTELS.length, "設定日期為今天…", { ok: 0, skip: 0 });
+        const sd = await askSetDate(tabId);
+        await sleep(2500); // 等價格依新日期重載
+        if (sd && sd.ok && sd.dates && sd.dates[0]) {
+          await progress(1, HOTELS.length, `日期已設今天 (${sd.dates[0]})`, { ok: 0, skip: 0 });
+        } else {
+          await progress(1, HOTELS.length, "⚠️ 自動設日期失敗，沿用 Google 預設日期", { ok: 0, skip: 0 });
+        }
+      }
       const d = await askExtract(tabId, h.id);
       if (d && d.hotelId && d.prices && Object.keys(d.prices).length) {
         const n = await storeScrape(d);
