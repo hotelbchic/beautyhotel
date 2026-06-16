@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "version": 1781604069451,
+  "lastUpdated": "2026-06-16T10:01:09.451Z",
+  "baseDate": "2026-06-16",
+  "offsets": [
+    0,
+    2,
+    4,
+    9,
+    11,
+    16,
+    18,
+    23,
+    25,
+    29
+  ],
+  "samples": {
+    "0": {
+      "own": 1029,
+      "qiancai": 1022,
+      "roumei": 1596,
+      "shemei": 894,
+      "zhenmei": 1059,
+      "tianjin": 1242
+    },
+    "2": {
+      "own": 1029,
+      "qiancai": 1483,
+      "shemei": 969,
+      "zhenmei": 1223,
+      "tianjin": 1278,
+      "napt": 726
+    },
+    "4": {
+      "own": 2368
+    },
+    "9": {
+      "roumei": 1670,
+      "shemei": 1513
+    },
+    "11": {},
+    "16": {
+      "roumei": 1797,
+      "shemei": 1494,
+      "zhenmei": 1011,
+      "tianjin": 1116,
+      "napt": 726
+    },
+    "18": {
+      "own": 2619,
+      "qiancai": 2492,
+      "roumei": 4352,
+      "shemei": 3479,
+      "zhenmei": 2554,
+      "tianjin": 2839,
+      "napt": 3301
+    },
+    "23": {
+      "own": 935,
+      "qiancai": 1022,
+      "roumei": 1586,
+      "shemei": 1031,
+      "zhenmei": 1025,
+      "tianjin": 1282,
+      "napt": 726
+    },
+    "25": {
+      "own": 2619,
+      "qiancai": 2492,
+      "roumei": 4505,
+      "shemei": 3620,
+      "zhenmei": 2409,
+      "tianjin": 3369,
+      "napt": 2206
+    },
+    "29": {
+      "own": 935,
+      "qiancai": 1278,
+      "roumei": 1822,
+      "shemei": 1031,
+      "zhenmei": 1111,
+      "tianjin": 1282,
+      "napt": 726
+    }
+  }
+}
