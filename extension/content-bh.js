@@ -11,6 +11,9 @@
       <button id="bh-auto-btn" type="button" style="background:linear-gradient(135deg,#27ae60,#2ecc71);margin-bottom:8px;">
         <span>⚡ 一鍵全抓 10 間 + 更新</span>
       </button>
+      <button id="bh-sample-btn" type="button" style="background:linear-gradient(135deg,#2980b9,#3498db);margin-bottom:8px;">
+        <span>📅 抓 30 天取樣（約 10 分）</span>
+      </button>
       <button id="bh-import-btn" type="button">
         <span>📥 從擴充匯入</span>
         <span class="bh-counter" id="bh-import-count">0</span>
@@ -34,6 +37,16 @@
       pollAuto();
     }
     autoBtn.addEventListener("click", triggerAuto);
+
+    // 30 天取樣
+    const sampleBtn = root.querySelector("#bh-sample-btn");
+    if (sampleBtn) sampleBtn.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "startSampleScan" }, (resp) => {
+        if (resp && resp.started) showToast("⏳ 30 天取樣已開始（約 10 分鐘，抓 10 個代表日 ×10 間）…請勿關閉 Google 分頁，完成後本頁自動更新");
+        else showToast("⚠️ 已經在跑了");
+      });
+      pollAuto();
+    });
 
     // 把頁面右上角原本的「🔄 即時比價」按鈕也接上一鍵全抓（裝了擴充才有此行為）
     document.querySelectorAll(".header-tag").forEach((t) => {

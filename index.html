@@ -697,6 +697,47 @@ function updateDataNotice(data){
   el.textContent=`目前顯示「${ci} ${dow}${dow&&!data.isWeekend?'（平日）':data.isWeekend?'（週末）':''}」一晚房價${upd?'｜更新於 '+upd:''}`;
 }
 
+// ===== 30 天取樣 (data/calendar.json) =====
+// 擴充取樣幾個代表日的真實價，這裡用「最近的同類型(平日/週末)取樣點」補滿 30 天。
+let calLoaded=false;
+async function loadCalendar(){
+  try{
+    const res=await fetch('data/calendar.json?t='+Date.now(),{cache:'no-store'});
+    if(!res.ok)return;
+    const cal=await res.json();
+    if(!cal||!cal.samples||!cal.offsets)return;
+    const offs=cal.offsets.map(Number);
+    // 每個 offset 是平日還是週末（用今天 dates[] 判斷）
+    const isWk=(off)=>off<dates.length?isWeekend(dates[off]):false;
+    hotels.forEach(h=>{
+      const arr=new Array(30).fill(null);
+      // 先放真實取樣點
+      const sampled=offs.filter(o=>cal.samples[o]&&typeof cal.samples[o][h.id]==='number');
+      if(sampled.length===0){return;} // 這間沒取樣到，維持原本
+      offs.forEach(o=>{ const v=cal.samples[o]&&cal.samples[o][h.id]; if(typeof v==='number'&&o<30)arr[o]=v; });
+      // 補滿：每天找最近的「同類型」取樣點
+      for(let i=0;i<30;i++){
+        if(arr[i]!=null)continue;
+        const wantWk=isWk(i);
+        let best=null,bestDist=999;
+        sampled.forEach(o=>{ if(isWk(o)===wantWk){const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}} });
+        if(best===null){ sampled.forEach(o=>{const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}}); } // 退而求其次任意最近
+        if(best!==null)arr[i]=cal.samples[best][h.id];
+      }
+      priceData[h.id]=arr;
+    });
+    calLoaded=true;
+    // 更新分頁提示
+    const upd=cal.lastUpdated?new Date(cal.lastUpdated).toLocaleString('zh-TW',{month:'numeric',day:'numeric'}):'';
+    document.querySelectorAll('#tab-trend .update-notice, #tab-calendar .update-notice').forEach(el=>{
+      el.style.background='#eefaf0';el.style.borderColor='#27ae60';el.style.color='#1e7a40';
+      el.innerHTML=`✅ <strong>真實取樣 30 天</strong>（更新於 ${upd}）：抓取 ${offs.length} 個代表日的真實房價，其餘日用最近的同類型(平日/週末)取樣點推估。`;
+    });
+    if(trendChart)updateChart();
+    if(document.querySelector('#thirtyBody tr'))buildThirtyTable();
+  }catch(e){console.warn('calendar load failed',e);}
+}
+
 // ===== 歷史趨勢 (data/history/*.json) =====
 async function buildHistory(){
   const notice=document.getElementById('histNotice');
@@ -750,6 +791,7 @@ async function buildHistory(){
 loadState();
 renderTable(); updateInsights(); setUpdateTime();
 loadRemote(); // 非同步：抓到更新的遠端資料會自動重繪
+loadCalendar(); // 非同步：有 30 天取樣資料就用真實值補滿日曆/走勢圖
 </script>
 </body>
 </html>

@@ -19,7 +19,27 @@ const HOTELS = [
 const ALL_IDS = HOTELS.map((h) => h.id);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const gtURL = (q) => `https://www.google.com/travel/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=tw`;
+const gtURL = (q, ts) =>
+  `https://www.google.com/travel/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=tw` + (ts ? `&ts=${ts}` : "");
+
+// 用 protobuf 組出 Google Travel 的日期參數 ts（已實測：可精準設定任意入住日）
+function _vint(n) { const o = []; while (n > 127) { o.push((n & 127) | 128); n = Math.floor(n / 128); } o.push(n); return o; }
+function _LD(f, b) { return [(f << 3) | 2].concat(_vint(b.length)).concat(b); }
+function _V(f, n) { return [(f << 3) | 0].concat(_vint(n)); }
+function _dateMsg(y, m, d) { return _V(1, y).concat(_V(2, m)).concat(_V(3, d)); }
+function buildTs(ci, co) {
+  const stay = _LD(1, _dateMsg(ci.y, ci.m, ci.d)).concat(_LD(2, _dateMsg(co.y, co.m, co.d)));
+  const B = _LD(2, stay).concat(_LD(6, _V(1, 2)));
+  const top = _V(1, 0).concat(_LD(3, _LD(2, B))).concat(_LD(5, _LD(1, _LD(7, [0x54, 0x57, 0x44]))));
+  let s = ""; top.forEach((x) => (s += String.fromCharCode(x)));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+// 把 baseDate(YYYY-MM-DD) + 偏移天數 → {y,m,d}
+function dayFromOffset(baseISO, off) {
+  const [Y, M, D] = baseISO.split("-").map(Number);
+  const d = new Date(Y, M - 1, D + off);
+  return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), dow: d.getDay() };
+}
 
 // 找使用者已開好、且設好日期的 Google Travel 分頁，回傳 tabId。
 // 關鍵：日期只在「同一分頁內換搜尋」才會保留，所以要重用這個分頁、不要開新分頁。
@@ -246,6 +266,86 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === "getAutoStatus") {
     chrome.storage.local.get(["bhAutoStatus"], (r) => sendResponse(r.bhAutoStatus || null));
     return true;
+  }
+});
+
+// ===== 30 天智慧取樣 =====
+// 抓未來幾個代表日(平日+週末)×10 間，存成 data/calendar.json；頁面再內插補滿 30 天。
+// 取樣偏移(天)：涵蓋未來 ~4 週、平日與週末都有
+const SAMPLE_OFFSETS = [0, 2, 4, 9, 11, 16, 18, 23, 25, 29];
+
+async function ghPutCalendar(baseISO, samples, cfg) {
+  // samples: { offset: { hotelId: price } }
+  const obj = {
+    schemaVersion: 1,
+    version: Date.now(),
+    lastUpdated: new Date().toISOString(),
+    baseDate: baseISO,
+    offsets: SAMPLE_OFFSETS,
+    samples, // 真實取樣點
+  };
+  await ghPut("data/calendar.json", obj, `data: 30天取樣 ${baseISO} (auto)`, cfg);
+}
+
+async function runSampleScan() {
+  if (RUNNING) return;
+  RUNNING = true;
+  const tabId = await findUserTravelTab();
+  if (!tabId) {
+    await setStatus({ running: false, done: true, error: true, ts: Date.now(),
+      msg: "❌ 請先開一個 Google Travel 分頁並保持開著，再按 30 天取樣。" });
+    RUNNING = false; return;
+  }
+  // 用使用者分頁目前的日期當 baseDate（讀第一間就知道；簡化用今天）
+  const now = new Date();
+  const baseISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const samples = {};
+  const total = SAMPLE_OFFSETS.length * HOTELS.length;
+  let done = 0, okCount = 0;
+  try {
+    await chrome.tabs.update(tabId, { active: true });
+    for (const off of SAMPLE_OFFSETS) {
+      const ci = dayFromOffset(baseISO, off);
+      const co = dayFromOffset(baseISO, off + 1);
+      const ts = buildTs({ y: ci.y, m: ci.m, d: ci.d }, { y: co.y, m: co.m, d: co.d });
+      samples[off] = {};
+      for (const h of HOTELS) {
+        done++;
+        await progress(done, total, `第 +${off} 天 · ${h.id}`, { ok: okCount });
+        await chrome.tabs.update(tabId, { url: gtURL(h.q, ts) });
+        await waitTabComplete(tabId);
+        await sleep(2500);
+        const d = await askExtract(tabId, h.id);
+        if (d && d.prices && Object.keys(d.prices).length) {
+          const v = Math.min(...Object.values(d.prices).filter((x) => typeof x === "number"));
+          samples[off][h.id] = v;
+          okCount++;
+        }
+        await sleep(3500); // 對 Google 友善
+      }
+    }
+    await setStatus({ running: true, i: total, total, msg: "推送 30 天取樣到 GitHub…", ok: okCount });
+    let pushMsg;
+    try {
+      const cfg = await getCfg();
+      if (!cfg.token) pushMsg = "未推送：沒設 GitHub Token";
+      else { cfg.repo = cfg.repo || "hotelbchic/beautyhotel"; cfg.branch = cfg.branch || "main"; await ghPutCalendar(baseISO, samples, cfg); pushMsg = "已推送，比價表 30 天分頁會用真實取樣"; }
+    } catch (e) { pushMsg = `推送失敗：${(e && e.message) || e}`; }
+    await setStatus({ running: false, done: true, i: total, total,
+      msg: `🎉 30 天取樣完成：${okCount}/${total} 點。${pushMsg}`, ok: okCount });
+  } catch (e) {
+    await setStatus({ running: false, done: true, error: true, msg: `❌ 中斷：${(e && e.message) || e}`, ts: Date.now() });
+  } finally {
+    RUNNING = false;
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "startSampleScan") {
+    if (RUNNING) { sendResponse({ started: false, reason: "already running" }); return; }
+    runSampleScan();
+    sendResponse({ started: true });
+    return;
   }
 });
 
