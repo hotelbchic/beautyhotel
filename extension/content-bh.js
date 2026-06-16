@@ -25,13 +25,23 @@
     const counter = root.querySelector("#bh-import-count");
 
     // 一鍵全抓：叫背景引擎自動跑 10 間 + 推 GitHub；跑完自動重整本頁看新價
-    autoBtn.addEventListener("click", () => {
+    function triggerAuto() {
       if (!confirm("將自動開一個分頁，依序抓 10 間飯店（約 1.5-2 分鐘）再推送到 GitHub，完成後本頁自動更新。\n過程中請勿關閉那個分頁。開始？")) return;
       chrome.runtime.sendMessage({ type: "startAutoBatch" }, (resp) => {
         if (resp && resp.started) showToast("⏳ 已開始，請看新開的分頁逐間跑…約 1.5-2 分鐘，完成後本頁會自動更新");
         else showToast("⚠️ 已經在跑了");
       });
       pollAuto();
+    }
+    autoBtn.addEventListener("click", triggerAuto);
+
+    // 把頁面右上角原本的「🔄 即時比價」按鈕也接上一鍵全抓（裝了擴充才有此行為）
+    document.querySelectorAll(".header-tag").forEach((t) => {
+      if (t.textContent.includes("即時比價") && !t.dataset.bhHijacked) {
+        t.dataset.bhHijacked = "1";
+        t.setAttribute("title", "一鍵全抓 10 間 + 推送更新（擴充）");
+        t.addEventListener("click", (e) => { e.stopImmediatePropagation(); e.preventDefault(); triggerAuto(); }, true);
+      }
     });
     let pollTimer = null;
     function pollAuto() {
