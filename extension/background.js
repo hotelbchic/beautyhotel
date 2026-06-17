@@ -141,6 +141,7 @@ const AGODA_PATHS = {
   apt35: "35apt/hotel/taipei-tw.html",
   bchic: "beauty-hotels-taipei-hotel-bchic/hotel/taipei-tw.html",
   napt: "zhongshan-n-apt/hotel/taipei-tw.html",
+  yunfu: "yoyo-hotel_2/hotel/taipei-tw.html", // 雲富大飯店 Hotel Cloud-ZhongShan
 };
 const agodaURL = (path, ciISO, coISO) =>
   `https://www.agoda.com/zh-tw/${path}?checkIn=${ciISO}&checkOut=${coISO}&adults=2&los=1&priceCur=TWD`;
