@@ -292,70 +292,74 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-// ===== 30 天智慧取樣 =====
-// 抓未來幾個代表日(平日+週末)×10 間，存成 data/calendar.json；頁面再內插補滿 30 天。
-// 取樣偏移(天)：涵蓋未來 ~4 週、平日與週末都有
-const SAMPLE_OFFSETS = [0, 2, 4, 9, 11, 16, 18, 23, 25, 29];
-
-async function ghPutCalendar(baseISO, samples, cfg) {
-  // samples: { offset: { hotelId: price } }
-  const obj = {
-    schemaVersion: 1,
-    version: Date.now(),
-    lastUpdated: new Date().toISOString(),
-    baseDate: baseISO,
-    offsets: SAMPLE_OFFSETS,
-    samples, // 真實取樣點
-  };
-  await ghPut("data/calendar.json", obj, `data: 30天取樣 ${baseISO} (auto)`, cfg);
+// ===== 日期區間掃描（最多 14 天，每天都抓真實價）=====
+// 存 data/calendar.json：{ days: { "YYYY-MM-DD": { hotelId: price } } }，頁面直接照日期顯示，不內插。
+function listDates(startISO, endISO) {
+  const [sy, sm, sd] = startISO.split("-").map(Number);
+  const [ey, em, ed] = endISO.split("-").map(Number);
+  const start = new Date(sy, sm - 1, sd), end = new Date(ey, em - 1, ed);
+  const out = [];
+  for (let t = start.getTime(); t <= end.getTime(); t += 86400000) {
+    const d = new Date(t);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    if (out.length >= 14) break; // 安全上限
+  }
+  return out;
 }
 
-async function runSampleScan() {
+async function runRangeScan(startISO, endISO) {
   if (RUNNING) return;
   RUNNING = true;
-  const baseISO = todayISO();
-  const samples = {};
-  const total = SAMPLE_OFFSETS.length * HOTELS.length;
+  const dateList = listDates(startISO, endISO);
+  const days = {};
+  const total = dateList.length * HOTELS.length;
   let done = 0, okCount = 0;
   let win;
   try {
-    win = await openScanWindow(); // 開新視窗跑，跑完自動關
-    for (const off of SAMPLE_OFFSETS) {
-      const ts = tsForOffset(baseISO, off);
-      samples[off] = {};
+    win = await openScanWindow();
+    for (const iso of dateList) {
+      const [Y, M, D] = iso.split("-").map(Number);
+      const co = new Date(Y, M - 1, D + 1);
+      const ts = buildTs({ y: Y, m: M, d: D }, { y: co.getFullYear(), m: co.getMonth() + 1, d: co.getDate() });
+      days[iso] = {};
       for (const h of HOTELS) {
         done++;
-        await progress(done, total, `第 +${off} 天 · ${h.id}`, { ok: okCount });
+        await progress(done, total, `${iso.slice(5)} · ${h.id}`, { ok: okCount });
         const d = await scrapeOnce(win.tabId, h.q, h.id, ts);
         if (d && d.prices && Object.keys(d.prices).length) {
-          const v = Math.min(...Object.values(d.prices).filter((x) => typeof x === "number"));
-          samples[off][h.id] = v;
+          days[iso][h.id] = Math.min(...Object.values(d.prices).filter((x) => typeof x === "number"));
           okCount++;
         }
-        await sleep(5000); // 對 Google 友善(放慢降低 504)
+        await sleep(5000);
       }
     }
-    await setStatus({ running: true, i: total, total, msg: "推送 30 天取樣到 GitHub…", ok: okCount });
+    await setStatus({ running: true, i: total, total, msg: "推送區間房價到 GitHub…", ok: okCount });
     let pushMsg;
     try {
       const cfg = await getCfg();
       if (!cfg.token) pushMsg = "未推送：沒設 GitHub Token";
-      else { cfg.repo = cfg.repo || "hotelbchic/beautyhotel"; cfg.branch = cfg.branch || "main"; await ghPutCalendar(baseISO, samples, cfg); pushMsg = "已推送，比價表 30 天分頁會用真實取樣"; }
+      else {
+        cfg.repo = cfg.repo || "hotelbchic/beautyhotel"; cfg.branch = cfg.branch || "main";
+        const obj = { schemaVersion: 2, version: Date.now(), lastUpdated: new Date().toISOString(),
+          rangeStart: startISO, rangeEnd: dateList[dateList.length - 1], days };
+        await ghPut("data/calendar.json", obj, `data: 區間房價 ${startISO}~${dateList[dateList.length - 1]} (auto)`, cfg);
+        pushMsg = "已推送，比價表日曆/走勢圖會顯示這區間真實價";
+      }
     } catch (e) { pushMsg = `推送失敗：${(e && e.message) || e}`; }
     await setStatus({ running: false, done: true, i: total, total,
-      msg: `🎉 30 天取樣完成：${okCount}/${total} 點。${pushMsg}`, ok: okCount });
+      msg: `🎉 區間完成：${okCount}/${total} 點（${dateList.length} 天）。${pushMsg}`, ok: okCount });
   } catch (e) {
     await setStatus({ running: false, done: true, error: true, msg: `❌ 中斷：${(e && e.message) || e}`, ts: Date.now() });
   } finally {
     RUNNING = false;
-    if (win) await closeWindow(win.winId); // 跑完自動關閉視窗
+    if (win) await closeWindow(win.winId);
   }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.type === "startSampleScan") {
+  if (msg && msg.type === "startRangeScan") {
     if (RUNNING) { sendResponse({ started: false, reason: "already running" }); return; }
-    runSampleScan();
+    runRangeScan(msg.startISO, msg.endISO);
     sendResponse({ started: true });
     return;
   }

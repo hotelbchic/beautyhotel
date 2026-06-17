@@ -697,45 +697,32 @@ function updateDataNotice(data){
   el.textContent=`目前顯示「${ci} ${dow}${dow&&!data.isWeekend?'（平日）':data.isWeekend?'（週末）':''}」一晚房價${upd?'｜更新於 '+upd:''}`;
 }
 
-// ===== 30 天取樣 (data/calendar.json) =====
-// 擴充取樣幾個代表日的真實價，這裡用「最近的同類型(平日/週末)取樣點」補滿 30 天。
+// ===== 區間真實房價 (data/calendar.json) =====
+// 擴充抓某段日期區間(每天)的真實價，這裡照「日期」對應到 30 天格子，不內插；區間外留空。
 let calLoaded=false;
 async function loadCalendar(){
   try{
     const res=await fetch('data/calendar.json?t='+Date.now(),{cache:'no-store'});
     if(!res.ok)return;
     const cal=await res.json();
-    if(!cal||!cal.samples||!cal.offsets)return;
-    const offs=cal.offsets.map(Number);
-    // 高價日判斷：飯店房價的貴日是「週五、週六入住」(getDay 5/6)，不是週六日
-    const isHigh=(off)=>{ if(off>=dates.length)return false; const g=dates[off].getDay(); return g===5||g===6; };
+    if(!cal||!cal.days)return;
+    const isoOf=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     hotels.forEach(h=>{
       const arr=new Array(30).fill(null);
-      // 先放真實取樣點
-      const sampled=offs.filter(o=>cal.samples[o]&&typeof cal.samples[o][h.id]==='number');
-      if(sampled.length<2){ // 取樣點太少(<2)就不硬補，避免亂填；只放有抓到的點
-        sampled.forEach(o=>{ if(o<30)arr[o]=cal.samples[o][h.id]; });
-        if(sampled.length)priceData[h.id]=arr;
-        return;
-      }
-      offs.forEach(o=>{ const v=cal.samples[o]&&cal.samples[o][h.id]; if(typeof v==='number'&&o<30)arr[o]=v; });
-      // 補滿：每天找最近的「同類型(高價日/平日)」取樣點
+      let any=false;
       for(let i=0;i<30;i++){
-        if(arr[i]!=null)continue;
-        const wantHigh=isHigh(i);
-        let best=null,bestDist=999;
-        sampled.forEach(o=>{ if(isHigh(o)===wantHigh){const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}} });
-        if(best===null){ sampled.forEach(o=>{const d=Math.abs(o-i); if(d<bestDist){bestDist=d;best=o;}}); } // 同類型沒有就取最近任意
-        if(best!==null)arr[i]=cal.samples[best][h.id];
+        const iso=isoOf(dates[i]);
+        const v=cal.days[iso]&&cal.days[iso][h.id];
+        if(typeof v==='number'){arr[i]=v;any=true;}
       }
-      priceData[h.id]=arr;
+      if(any)priceData[h.id]=arr;
     });
     calLoaded=true;
-    // 更新分頁提示
     const upd=cal.lastUpdated?new Date(cal.lastUpdated).toLocaleString('zh-TW',{month:'numeric',day:'numeric'}):'';
+    const rs=cal.rangeStart||'',re=cal.rangeEnd||'';
     document.querySelectorAll('#tab-trend .update-notice, #tab-calendar .update-notice').forEach(el=>{
       el.style.background='#eefaf0';el.style.borderColor='#27ae60';el.style.color='#1e7a40';
-      el.innerHTML=`✅ <strong>真實取樣 30 天</strong>（更新於 ${upd}）：抓取 ${offs.length} 個代表日的真實房價，其餘日用最近的同類型(平日/週末)取樣點推估。`;
+      el.innerHTML=`✅ <strong>真實房價區間 ${rs} ~ ${re}</strong>（更新於 ${upd}）：此區間每天都是抓取的真實價；區間以外的日子留空。`;
     });
     if(trendChart)updateChart();
     if(document.querySelector('#thirtyBody tr'))buildThirtyTable();

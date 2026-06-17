@@ -11,9 +11,16 @@
       <button id="bh-auto-btn" type="button" style="background:linear-gradient(135deg,#27ae60,#2ecc71);margin-bottom:8px;">
         <span>⚡ 一鍵全抓 10 間 + 更新</span>
       </button>
-      <button id="bh-sample-btn" type="button" style="background:linear-gradient(135deg,#2980b9,#3498db);margin-bottom:8px;">
-        <span>📅 抓 30 天取樣（約 10 分）</span>
-      </button>
+      <div id="bh-range-panel" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:10px 12px;margin-bottom:8px;color:#fff;font-size:12px;">
+        <div style="font-weight:700;margin-bottom:6px;">📅 抓日期區間（最多 14 天）</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+          <input type="date" id="bh-range-start" style="flex:1;border-radius:6px;border:none;padding:4px;font-size:12px;">
+          <span>→</span>
+          <input type="date" id="bh-range-end" style="flex:1;border-radius:6px;border:none;padding:4px;font-size:12px;">
+        </div>
+        <div id="bh-range-hint" style="font-size:11px;color:rgba(255,255,255,.55);margin-bottom:6px;">選好區間（每天都抓真實價）</div>
+        <button id="bh-range-btn" type="button" style="width:100%;background:linear-gradient(135deg,#2980b9,#3498db);border:none;border-radius:8px;color:#fff;padding:8px;font-weight:700;cursor:pointer;font-family:inherit;">📅 抓這區間</button>
+      </div>
       <button id="bh-import-btn" type="button">
         <span>📥 從擴充匯入</span>
         <span class="bh-counter" id="bh-import-count">0</span>
@@ -38,11 +45,38 @@
     }
     autoBtn.addEventListener("click", triggerAuto);
 
-    // 30 天取樣
-    const sampleBtn = root.querySelector("#bh-sample-btn");
-    if (sampleBtn) sampleBtn.addEventListener("click", () => {
-      chrome.runtime.sendMessage({ type: "startSampleScan" }, (resp) => {
-        if (resp && resp.started) showToast("⏳ 30 天取樣已開始（會彈出新視窗，約 10 分鐘抓 10 代表日×10 間）…跑完自動關閉視窗、本頁自動更新");
+    // 日期區間抓（最多 14 天，每天都抓真實價）
+    const startInp = root.querySelector("#bh-range-start");
+    const endInp = root.querySelector("#bh-range-end");
+    const rangeBtn = root.querySelector("#bh-range-btn");
+    const rangeHint = root.querySelector("#bh-range-hint");
+    const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const _today = new Date();
+    const _wk = new Date(_today.getTime() + 6 * 86400000);
+    if (startInp) { startInp.value = isoOf(_today); startInp.min = isoOf(_today); }
+    if (endInp) { endInp.value = isoOf(_wk); endInp.min = isoOf(_today); }
+    function rangeDays() {
+      if (!startInp.value || !endInp.value) return null;
+      const s = new Date(startInp.value + "T00:00:00"), e = new Date(endInp.value + "T00:00:00");
+      const n = Math.round((e - s) / 86400000) + 1;
+      return n;
+    }
+    function refreshHint() {
+      const n = rangeDays();
+      if (n === null) { rangeHint.textContent = "請選開始與結束日期"; rangeHint.style.color = "#ff9bb0"; return false; }
+      if (n < 1) { rangeHint.textContent = "結束日不能早於開始日"; rangeHint.style.color = "#ff9bb0"; return false; }
+      if (n > 14) { rangeHint.textContent = `${n} 天太多，最多 14 天`; rangeHint.style.color = "#ff9bb0"; return false; }
+      rangeHint.textContent = `共 ${n} 天 × 10 間 ≈ ${n * 10} 次查詢，約 ${Math.ceil(n * 10 * 8 / 60)} 分鐘`;
+      rangeHint.style.color = "rgba(255,255,255,.55)";
+      return true;
+    }
+    if (startInp) startInp.addEventListener("change", refreshHint);
+    if (endInp) endInp.addEventListener("change", refreshHint);
+    refreshHint();
+    if (rangeBtn) rangeBtn.addEventListener("click", () => {
+      if (!refreshHint()) { showToast("⚠️ " + rangeHint.textContent); return; }
+      chrome.runtime.sendMessage({ type: "startRangeScan", startISO: startInp.value, endISO: endInp.value }, (resp) => {
+        if (resp && resp.started) showToast(`⏳ 開始抓 ${startInp.value} ~ ${endInp.value}（彈出新視窗自動跑），跑完自動關閉、本頁更新`);
         else showToast("⚠️ 已經在跑了");
       });
       pollAuto();
