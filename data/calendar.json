@@ -1,85 +1,21 @@
 {
   "schemaVersion": 2,
-  "version": 1781666465299,
-  "lastUpdated": "2026-06-17T03:21:05.299Z",
+  "version": 1781688305409,
+  "lastUpdated": "2026-06-17T09:25:05.409Z",
   "rangeStart": "2026-06-17",
-  "rangeEnd": "2026-06-23",
+  "rangeEnd": "2026-06-17",
   "days": {
     "2026-06-17": {
       "own": 1084,
-      "bchic": 1152,
-      "apt35": 726,
-      "napt": 762
-    },
-    "2026-06-18": {
-      "own": 1029,
-      "bchic": 1189,
-      "qiancai": 1483,
-      "roumei": 1834,
-      "shemei": 969,
-      "zhenmei": 1086,
-      "tianjin": 1324,
-      "yunfu": 2072,
-      "apt35": 726
-    },
-    "2026-06-19": {
-      "own": 2406,
-      "bchic": 3233,
-      "qiancai": 1789,
-      "roumei": 3211,
-      "shemei": 2453,
-      "zhenmei": 2045,
-      "tianjin": 2378,
-      "yunfu": 3575,
-      "apt35": 1452,
-      "napt": 1839
-    },
-    "2026-06-20": {
-      "own": 1930,
-      "bchic": 3233,
-      "qiancai": 1789,
-      "roumei": 3360,
-      "shemei": 2262,
-      "zhenmei": 1901,
-      "tianjin": 2717,
-      "yunfu": 3775,
-      "apt35": 1365,
-      "napt": 2572
-    },
-    "2026-06-21": {
-      "own": 925,
-      "bchic": 1089,
-      "qiancai": 927,
-      "roumei": 1872,
-      "shemei": 975,
-      "zhenmei": 1043,
-      "tianjin": 1188,
-      "apt35": 581,
-      "napt": 690
-    },
-    "2026-06-22": {
-      "own": 935,
-      "bchic": 1201,
-      "qiancai": 927,
-      "roumei": 1670,
-      "shemei": 975,
-      "zhenmei": 1043,
-      "tianjin": 1373,
-      "yunfu": 1500,
-      "apt35": 581,
-      "napt": 690
-    },
-    "2026-06-23": {
-      "own": 935,
-      "bchic": 1149,
-      "qiancai": 927,
-      "roumei": 1670,
-      "shemei": 975,
-      "zhenmei": 1109,
-      "tianjin": 1373,
-      "yunfu": 1600,
-      "apt35": 581,
-      "napt": 726
+      "bchic": 1141,
+      "qiancai": 990,
+      "roumei": 1596,
+      "shemei": 894,
+      "zhenmei": 983,
+      "tianjin": 1242,
+      "yunfu": 1298,
+      "apt35": 486,
+      "napt": 635
     }
   }
 }
