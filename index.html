@@ -181,8 +181,8 @@
 <div class="tabs-sticky">
   <div class="tabs">
     <div class="tab active" onclick="switchTab('today')">📊 今日比價</div>
-    <div class="tab" onclick="switchTab('trend')">📈 30天走勢圖</div>
-    <div class="tab" onclick="switchTab('calendar')">📅 30天日曆價格表</div>
+    <div class="tab" onclick="switchTab('trend')">📈 14天走勢圖</div>
+    <div class="tab" onclick="switchTab('calendar')">📅 14天日曆價格表</div>
     <div class="tab" onclick="switchTab('history')">📉 歷史趨勢</div>
   </div>
 </div>
@@ -260,16 +260,16 @@
 </div>
 </div>
 
-<!-- TAB 2: 30天走勢圖 -->
+<!-- TAB 2: 14天走勢圖 -->
 <div class="tab-content" id="tab-trend">
 <div class="section">
   <div class="chart-wrap">
-    <h3>📈 未來30天房價走勢</h3>
+    <h3>📈 未來14天房價走勢</h3>
     <p>顯示各飯店三平台均價走勢（點擊飯店名稱可顯示/隱藏）</p>
     <div class="hotel-toggles" id="toggles"></div>
     <div class="chart-container"><canvas id="trendChart"></canvas></div>
   </div>
-  <div class="update-notice">💡 <strong>如何更新：</strong>切換到「30天日曆價格表」分頁，直接在表格中輸入各日期的房價，走勢圖會自動更新。</div>
+  <div class="update-notice">💡 <strong>如何更新：</strong>用擴充右下角「📅 抓日期區間」選一段日期（最多 14 天），自動抓真實價並更新走勢圖。</div>
 </div>
 </div>
 
@@ -286,10 +286,10 @@
 </div>
 </div>
 
-<!-- TAB 3: 30天日曆價格表 -->
+<!-- TAB 3: 14天日曆價格表 -->
 <div class="tab-content" id="tab-calendar">
 <div class="section">
-  <div class="update-notice" style="background:#fff0f0;border-color:#e94560;color:#a02030;">⚠️ <strong>注意：這 30 天數字是「電腦推算」不是真實抓取！</strong><br><span style="font-weight:normal;font-size:12px;">以各飯店今日均價為基準，週末 ×1.2、加 ±5% 隨機波動模擬出來的，僅供版面參考。真實多日房價請用擴充逐日抓取後覆蓋。紅框=峻美自家、橘底=週末，可直接點格子改成真實數字。</span></div>
+  <div class="update-notice" style="background:#fff0f0;border-color:#e94560;color:#a02030;">⚠️ <strong>還沒抓真實區間前，這裡是「電腦推算」僅供參考</strong><br><span style="font-weight:normal;font-size:12px;">用擴充右下角「📅 抓日期區間」選一段日期（最多 14 天）抓真實價後，這裡會換成真實資料並轉綠。紅框=峻美自家、橘底=週末，也可直接點格子手動改。</span></div>
   <div class="thirty-table-wrap">
     <div style="overflow-x:auto;">
       <table id="thirtyTable">
@@ -322,10 +322,10 @@ const hotels = [
   {id:'napt',    name:'中山北棧',          own:false, color:'#00b4d8', loc:'中山區中山北路', agoda:null, trip:null, booking:null, gname:'中山N.APT 台北'},
 ];
 
-// 30天資料: priceData[hotelId][dayIndex] = avg price
+// 14天資料: priceData[hotelId][dayIndex] = avg price
 const priceData = {};
 const today = new Date();
-const dates = Array.from({length:30},(_,i)=>{
+const dates = Array.from({length:14},(_,i)=>{
   const d = new Date(today); d.setDate(today.getDate()+i); return d;
 });
 
@@ -698,7 +698,7 @@ function updateDataNotice(data){
 }
 
 // ===== 區間真實房價 (data/calendar.json) =====
-// 擴充抓某段日期區間(每天)的真實價，這裡照「日期」對應到 30 天格子，不內插；區間外留空。
+// 擴充抓某段日期區間(每天)的真實價，這裡照「日期」對應到 14 天格子，不內插；區間外留空。
 let calLoaded=false;
 async function loadCalendar(){
   try{
@@ -708,9 +708,9 @@ async function loadCalendar(){
     if(!cal||!cal.days)return;
     const isoOf=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     hotels.forEach(h=>{
-      const arr=new Array(30).fill(null);
+      const arr=new Array(14).fill(null);
       let any=false;
-      for(let i=0;i<30;i++){
+      for(let i=0;i<14;i++){
         const iso=isoOf(dates[i]);
         const v=cal.days[iso]&&cal.days[iso][h.id];
         if(typeof v==='number'){arr[i]=v;any=true;}
