@@ -6,14 +6,14 @@
 
 const HOTELS = [
   { id: "own",     q: "峻美精品旅店 Hotel Bnight 台北" },
-  { id: "bchic",   q: "台北昇美精品旅店 Hotel Bchic" },
+  { id: "bchic",   q: "台北昇美精品旅店 Hotel Bchic 中山" },
   { id: "qiancai", q: "千彩格精品旅店 Colors Inn 台北" },
   { id: "roumei",  q: "柔美商務飯店 台北 中山" },
   { id: "shemei",  q: "碩美精品旅店 Hotel Bstay 台北" },
-  { id: "zhenmei", q: "甄美精品商旅 台北" },
+  { id: "zhenmei", q: "台北甄美精品旅店" },
   { id: "tianjin", q: "天津大酒店 Vagus Hotel 台北" },
-  { id: "yunfu",   q: "雲富大飯店 Hotel Cloud 台北" },
-  { id: "apt35",   q: "35APT 台北 中山" },
+  { id: "yunfu",   q: "雲富大飯店 中山" },
+  { id: "apt35",   q: "35APT 無人自助入住 中山" },
   { id: "napt",    q: "中山N.APT 台北" },
 ];
 const ALL_IDS = HOTELS.map((h) => h.id);
@@ -136,6 +136,24 @@ function askContent(tabId, payload, tries = 10) {
 const askExtract = (tabId, expectedId) => askContent(tabId, { type: "extractNow", expectedId });
 const askSetDate = (tabId) => askContent(tabId, { type: "setDateToday" });
 
+// 導航到某飯店該日 → 抓價；抓不到(載慢/504)就重載重試一次
+async function scrapeOnce(tabId, q, expectedId, ts) {
+  const url = gtURL(q, ts);
+  await chrome.tabs.update(tabId, { url });
+  await waitTabComplete(tabId);
+  await sleep(3000);
+  let d = await askExtract(tabId, expectedId);
+  if (!d || !d.prices || !Object.keys(d.prices).length) {
+    // 重載再試一次（對付 504 / 載入太慢）
+    await sleep(2500);
+    await chrome.tabs.update(tabId, { url: url + "&_r=1" });
+    await waitTabComplete(tabId);
+    await sleep(4000);
+    d = await askExtract(tabId, expectedId);
+  }
+  return d;
+}
+
 // ---- GitHub 推送（service worker 版，與 popup 邏輯一致）----
 function utf8ToBase64(str) {
   // service worker 沒有 unescape，用 TextEncoder
@@ -228,10 +246,7 @@ async function runAutoBatch() {
     for (let i = 0; i < HOTELS.length; i++) {
       const h = HOTELS[i];
       await progress(i + 1, HOTELS.length, `搜尋 ${h.id}（今天）…`, { ok: ok.length, skip: skip.length });
-      await chrome.tabs.update(win.tabId, { url: gtURL(h.q, ts) });
-      await waitTabComplete(win.tabId);
-      await sleep(3000); // 給 SPA 載入價格
-      const d = await askExtract(win.tabId, h.id);
+      const d = await scrapeOnce(win.tabId, h.q, h.id, ts);
       if (d && d.hotelId && d.prices && Object.keys(d.prices).length) {
         const n = await storeScrape(d);
         ok.push(h.id);
@@ -311,16 +326,13 @@ async function runSampleScan() {
       for (const h of HOTELS) {
         done++;
         await progress(done, total, `第 +${off} 天 · ${h.id}`, { ok: okCount });
-        await chrome.tabs.update(win.tabId, { url: gtURL(h.q, ts) });
-        await waitTabComplete(win.tabId);
-        await sleep(2500);
-        const d = await askExtract(win.tabId, h.id);
+        const d = await scrapeOnce(win.tabId, h.q, h.id, ts);
         if (d && d.prices && Object.keys(d.prices).length) {
           const v = Math.min(...Object.values(d.prices).filter((x) => typeof x === "number"));
           samples[off][h.id] = v;
           okCount++;
         }
-        await sleep(3500); // 對 Google 友善
+        await sleep(5000); // 對 Google 友善(放慢降低 504)
       }
     }
     await setStatus({ running: true, i: total, total, msg: "推送 30 天取樣到 GitHub…", ok: okCount });
