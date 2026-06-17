@@ -12,14 +12,14 @@
         <span>⚡ 一鍵全抓 10 間 + 更新</span>
       </button>
       <div id="bh-range-panel" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:10px 12px;margin-bottom:8px;color:#fff;font-size:12px;">
-        <div style="font-weight:700;margin-bottom:6px;">📅 抓日期區間（最多 14 天）</div>
+        <div style="font-weight:700;margin-bottom:6px;">🔄 抓日期區間（今日比價＋日曆一起更新，最多 14 天）</div>
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
           <input type="date" id="bh-range-start" style="flex:1;border-radius:6px;border:none;padding:4px;font-size:12px;">
           <span>→</span>
           <input type="date" id="bh-range-end" style="flex:1;border-radius:6px;border:none;padding:4px;font-size:12px;">
         </div>
         <div id="bh-range-hint" style="font-size:11px;color:rgba(255,255,255,.55);margin-bottom:6px;">選好區間（每天都抓真實價）</div>
-        <button id="bh-range-btn" type="button" style="width:100%;background:linear-gradient(135deg,#2980b9,#3498db);border:none;border-radius:8px;color:#fff;padding:8px;font-weight:700;cursor:pointer;font-family:inherit;">📅 抓這區間</button>
+        <button id="bh-range-btn" type="button" style="width:100%;background:linear-gradient(135deg,#2980b9,#3498db);border:none;border-radius:8px;color:#fff;padding:8px;font-weight:700;cursor:pointer;font-family:inherit;">🔄 抓這區間（全部更新）</button>
       </div>
       <button id="bh-import-btn" type="button">
         <span>📥 從擴充匯入</span>
