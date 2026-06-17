@@ -100,11 +100,29 @@
           showToast(`${s.running ? `⏳ (${s.i}/${s.total}) ` : ""}${s.msg || ""}`);
           if (s.done) {
             clearInterval(pollTimer); pollTimer = null;
-            // 推送完隔幾秒，等 GitHub Pages 更新後重整本頁
-            if (!s.error) setTimeout(() => location.reload(), 6000);
+            // 不要固定秒數重整(GitHub Pages 更新要 30-60 秒)，改成「輪詢到新資料真的上線才重整」
+            if (!s.error) waitFreshThenReload();
           }
         });
       }, 1000);
+    }
+
+    // 輪詢 GitHub 的 latest.json，等版本號比目前頁面新(=新資料已上線)才重整；最多等 ~100 秒
+    function waitFreshThenReload() {
+      let appliedVer = 0;
+      try { appliedVer = (JSON.parse(localStorage.getItem("bh_prices_v1")) || {}).ver || 0; } catch (e) {}
+      let tries = 0;
+      showToast("⏳ 等 GitHub 更新(約 30-60 秒)，好了自動重整顯示新價…");
+      const t = setInterval(() => {
+        tries++;
+        fetch("data/latest.json?t=" + Date.now(), { cache: "no-store" })
+          .then((r) => r.json())
+          .then((d) => {
+            const ver = typeof d.version === "number" ? d.version : (d.lastUpdated ? new Date(d.lastUpdated).getTime() : 0);
+            if (ver > appliedVer || tries >= 13) { clearInterval(t); location.reload(); }
+          })
+          .catch(() => { if (tries >= 13) { clearInterval(t); location.reload(); } });
+      }, 8000);
     }
 
     function showToast(html) {
