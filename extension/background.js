@@ -136,6 +136,32 @@ function askContent(tabId, payload, tries = 10) {
 const askExtract = (tabId, expectedId) => askContent(tabId, { type: "extractNow", expectedId });
 const askSetDate = (tabId) => askContent(tabId, { type: "setDateToday" });
 
+// Google 常漏抓的飯店 → 用 Agoda 飯店頁直連補（slug 已驗證）
+const AGODA_PATHS = {
+  apt35: "35apt/hotel/taipei-tw.html",
+  bchic: "beauty-hotels-taipei-hotel-bchic/hotel/taipei-tw.html",
+  napt: "zhongshan-n-apt/hotel/taipei-tw.html",
+};
+const agodaURL = (path, ciISO, coISO) =>
+  `https://www.agoda.com/zh-tw/${path}?checkIn=${ciISO}&checkOut=${coISO}&adults=2&los=1&priceCur=TWD`;
+const askAgoda = (tabId) => askContent(tabId, { type: "extractAgoda" });
+
+// 先 Google 抓；漏抓且有 Agoda slug 就改抓 Agoda 飯店頁
+async function scrapeWithFallback(tabId, h, ts, ciISO, coISO) {
+  const d = await scrapeOnce(tabId, h.q, h.id, ts);
+  if (d && d.prices && Object.keys(d.prices).length) return d;
+  if (AGODA_PATHS[h.id]) {
+    await chrome.tabs.update(tabId, { url: agodaURL(AGODA_PATHS[h.id], ciISO, coISO) });
+    await waitTabComplete(tabId);
+    await sleep(3500);
+    const a = await askAgoda(tabId);
+    if (a && a.price) {
+      return { hotelId: h.id, hotelName: h.id, dates: [ciISO.slice(5), coISO.slice(5)], prices: { agoda: a.price }, source: "agoda" };
+    }
+  }
+  return d;
+}
+
 // 導航到某飯店該日 → 抓價；抓不到(載慢/504)就重載重試一次
 async function scrapeOnce(tabId, q, expectedId, ts) {
   const url = gtURL(q, ts);
@@ -240,13 +266,16 @@ async function runAutoBatch() {
   // 開新視窗、用 ts 強制設成「今天」入住，不佔用使用者分頁；跑完自動關閉
   const baseISO = todayISO();
   const ts = tsForOffset(baseISO, 0);
+  const ci0 = dayFromOffset(baseISO, 0), co0 = dayFromOffset(baseISO, 1);
+  const ciISO = `${ci0.y}-${String(ci0.m).padStart(2, "0")}-${String(ci0.d).padStart(2, "0")}`;
+  const coISO = `${co0.y}-${String(co0.m).padStart(2, "0")}-${String(co0.d).padStart(2, "0")}`;
   let win;
   try {
     win = await openScanWindow();
     for (let i = 0; i < HOTELS.length; i++) {
       const h = HOTELS[i];
       await progress(i + 1, HOTELS.length, `搜尋 ${h.id}（今天）…`, { ok: ok.length, skip: skip.length });
-      const d = await scrapeOnce(win.tabId, h.q, h.id, ts);
+      const d = await scrapeWithFallback(win.tabId, h, ts, ciISO, coISO);
       if (d && d.hotelId && d.prices && Object.keys(d.prices).length) {
         const n = await storeScrape(d);
         ok.push(h.id);
@@ -320,12 +349,13 @@ async function runRangeScan(startISO, endISO) {
     for (const iso of dateList) {
       const [Y, M, D] = iso.split("-").map(Number);
       const co = new Date(Y, M - 1, D + 1);
+      const coISO = `${co.getFullYear()}-${String(co.getMonth() + 1).padStart(2, "0")}-${String(co.getDate()).padStart(2, "0")}`;
       const ts = buildTs({ y: Y, m: M, d: D }, { y: co.getFullYear(), m: co.getMonth() + 1, d: co.getDate() });
       days[iso] = {};
       for (const h of HOTELS) {
         done++;
         await progress(done, total, `${iso.slice(5)} · ${h.id}`, { ok: okCount });
-        const d = await scrapeOnce(win.tabId, h.q, h.id, ts);
+        const d = await scrapeWithFallback(win.tabId, h, ts, iso, coISO);
         if (d && d.prices && Object.keys(d.prices).length) {
           days[iso][h.id] = Math.min(...Object.values(d.prices).filter((x) => typeof x === "number"));
           okCount++;
