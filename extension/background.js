@@ -391,22 +391,37 @@ async function runRangeScan(startISO, endISO) {
       if (!cfg.token) pushMsg = "未推送：沒設 GitHub Token";
       else {
         cfg.repo = cfg.repo || "hotelbchic/beautyhotel"; cfg.branch = cfg.branch || "main";
+        // 合併：先讀雲端現有的 days，把這次的疊上去(不覆蓋掉之前抓的其他日期)
+        let mergedDays = {};
+        try {
+          const cur = await ghGetSha("data/calendar.json", cfg);
+          if (cur.json && cur.json.days) mergedDays = cur.json.days;
+        } catch (e) {}
+        Object.keys(days).forEach((d) => { mergedDays[d] = days[d]; }); // 新的覆蓋同一天、其餘保留
+        // 清掉今天以前的舊日期(過期沒意義、也避免無限長大)
+        const todayStr = todayISO();
+        Object.keys(mergedDays).forEach((d) => { if (d < todayStr) delete mergedDays[d]; });
+        const allDates = Object.keys(mergedDays).sort();
         const obj = { schemaVersion: 2, version: Date.now(), lastUpdated: new Date().toISOString(),
-          rangeStart: startISO, rangeEnd: dateList[dateList.length - 1], days };
-        await ghPut("data/calendar.json", obj, `data: 區間房價 ${startISO}~${dateList[dateList.length - 1]} (auto)`, cfg);
-        // 同時用「區間第一天」更新今日比價(latest.json)，達到一個按鈕全部同步
+          rangeStart: allDates[0] || startISO, rangeEnd: allDates[allDates.length - 1] || dateList[dateList.length - 1], days: mergedDays };
+        await ghPut("data/calendar.json", obj, `data: 區間房價合併 ${startISO}~${dateList[dateList.length - 1]} (auto)`, cfg);
+        // 只有「這次掃描從今天開始」才順便更新今日比價(避免掃未來日期時把今日比價改錯)
         const firstISO = dateList[0];
-        const firstDay = days[firstISO] || {};
-        const [fy, fm, fd] = firstISO.split("-").map(Number);
-        const fco = new Date(fy, fm - 1, fd + 1);
-        const dow = ["週日","週一","週二","週三","週四","週五","週六"][new Date(fy, fm - 1, fd).getDay()];
-        const hotelsObj = {};
-        ALL_IDS.forEach((id) => { hotelsObj[id] = { agoda: (typeof firstDay[id] === "number" ? firstDay[id] : null), trip: null, booking: null }; });
-        const latest = { schemaVersion: 1, version: Date.now() + 1, lastUpdated: new Date().toISOString(),
-          checkin: firstISO, checkout: `${fco.getFullYear()}-${String(fco.getMonth() + 1).padStart(2, "0")}-${String(fco.getDate()).padStart(2, "0")}`,
-          dayOfWeek: dow, isWeekend: ([5,6].includes(new Date(fy, fm - 1, fd).getDay())), source: "range-scan day0", hotels: hotelsObj };
-        await ghPut("data/latest.json", latest, `data: 今日比價(區間第一天 ${firstISO}) (auto)`, cfg);
-        pushMsg = "已推送，今日比價＋14天日曆/走勢圖都會更新";
+        if (firstISO === todayStr) {
+          const firstDay = days[firstISO] || {};
+          const [fy, fm, fd] = firstISO.split("-").map(Number);
+          const fco = new Date(fy, fm - 1, fd + 1);
+          const dow = ["週日","週一","週二","週三","週四","週五","週六"][new Date(fy, fm - 1, fd).getDay()];
+          const hotelsObj = {};
+          ALL_IDS.forEach((id) => { hotelsObj[id] = { agoda: (typeof firstDay[id] === "number" ? firstDay[id] : null), trip: null, booking: null }; });
+          const latest = { schemaVersion: 1, version: Date.now() + 1, lastUpdated: new Date().toISOString(),
+            checkin: firstISO, checkout: `${fco.getFullYear()}-${String(fco.getMonth() + 1).padStart(2, "0")}-${String(fco.getDate()).padStart(2, "0")}`,
+            dayOfWeek: dow, isWeekend: ([5,6].includes(new Date(fy, fm - 1, fd).getDay())), source: "range-scan day0", hotels: hotelsObj };
+          await ghPut("data/latest.json", latest, `data: 今日比價(區間第一天 ${firstISO}) (auto)`, cfg);
+          pushMsg = "已推送(合併)，今日比價＋14天日曆都更新";
+        } else {
+          pushMsg = "已推送(合併)，14天日曆更新(今日比價不動)";
+        }
       }
     } catch (e) { pushMsg = `推送失敗：${(e && e.message) || e}`; }
     await setStatus({ running: false, done: true, i: total, total,
