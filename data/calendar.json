@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": 1782625206817,
-  "lastUpdated": "2026-06-28T05:40:06.817Z",
-  "rangeStart": "2026-07-01",
+  "version": 1782629346724,
+  "lastUpdated": "2026-06-28T06:49:06.724Z",
+  "rangeStart": "2026-06-28",
   "rangeEnd": "2026-07-04",
   "days": {
     "2026-07-01": {
@@ -52,6 +52,42 @@
       "yunfu": 3552,
       "apt35": 2398,
       "napt": 2021
+    },
+    "2026-06-28": {
+      "own": 982,
+      "bchic": 1314,
+      "qiancai": 880,
+      "roumei": 1401,
+      "shemei": 893,
+      "zhenmei": 966,
+      "tianjin": 1096,
+      "yunfu": 1298,
+      "apt35": 598,
+      "napt": 606
+    },
+    "2026-06-29": {
+      "own": 891,
+      "bchic": 1215,
+      "qiancai": 880,
+      "roumei": 1572,
+      "shemei": 1028,
+      "zhenmei": 1022,
+      "tianjin": 1098,
+      "yunfu": 1298,
+      "apt35": 557,
+      "napt": 602
+    },
+    "2026-06-30": {
+      "own": 889,
+      "bchic": 1185,
+      "qiancai": 880,
+      "roumei": 1775,
+      "shemei": 892,
+      "zhenmei": 960,
+      "tianjin": 1095,
+      "yunfu": 1298,
+      "apt35": 673,
+      "napt": 673
     }
   }
 }
