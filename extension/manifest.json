@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "beautyhotel 房價同步",
   "short_name": "房價同步",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "在 Google Travel 頁面一鍵抓取飯店 3 OTA 房價，匯入到 hotelbchic.github.io/beautyhotel 比價表。",
   "icons": {
     "16": "icons/icon16.png",

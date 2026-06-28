@@ -138,16 +138,36 @@ const askSetDate = (tabId) => askContent(tabId, { type: "setDateToday" });
 
 // Google 常漏抓的飯店 → 用 Agoda 飯店頁直連補（slug 已驗證）
 const AGODA_PATHS = {
-  apt35: "35apt/hotel/taipei-tw.html",
-  bchic: "beauty-hotels-taipei-hotel-bchic/hotel/taipei-tw.html",
-  napt: "zhongshan-n-apt/hotel/taipei-tw.html",
-  yunfu: "yoyo-hotel_2/hotel/taipei-tw.html", // 雲富大飯店 Hotel Cloud-ZhongShan
+  own:     "beauty-hotels-taipei-hotel-bnight/hotel/taipei-tw.html", // 峻美 Hotel Bnight
+  bchic:   "beauty-hotels-taipei-hotel-bchic/hotel/taipei-tw.html",
+  qiancai: "colors-infinity-inn/hotel/taipei-tw.html",               // 千彩格 (已驗證)
+  roumei:  "beauty-hotels-roumei-boutique/hotel/taipei-tw.html",     // 柔美
+  shemei:  "beauty-hotels-taipei-hotel-bstay/hotel/taipei-tw.html",  // 碩美 Hotel Bstay
+  zhenmei: "beauty-hotels-taipei-hotel-bfun/hotel/taipei-tw.html",   // 甄美 Hotel Bfun
+  tianjin: "vagus-hotel-h64237005/hotel/taipei-tw.html",             // 天津 Vagus
+  yunfu:   "yoyo-hotel_2/hotel/taipei-tw.html",                      // 雲富 Hotel Cloud
+  apt35:   "35apt/hotel/taipei-tw.html",                             // 35號公寓
+  napt:    "zhongshan-n-apt/hotel/taipei-tw.html",                   // 中山北棧 中山N.APT
 };
 const agodaURL = (path, ciISO, coISO) =>
   `https://www.agoda.com/zh-tw/${path}?checkIn=${ciISO}&checkOut=${coISO}&adults=2&los=1&priceCur=TWD`;
 const askAgoda = (tabId) => askContent(tabId, { type: "extractAgoda" });
 
-// 先 Google 抓；漏抓且有 Agoda slug 就改抓 Agoda 飯店頁
+// 區間掃描用：Agoda 直連優先(未來日期 Google 會被擋)，抓不到才退回 Google
+async function scrapeAgodaFirst(tabId, h, ts, ciISO, coISO) {
+  if (AGODA_PATHS[h.id]) {
+    await chrome.tabs.update(tabId, { url: agodaURL(AGODA_PATHS[h.id], ciISO, coISO) });
+    await waitTabComplete(tabId);
+    await sleep(3000);
+    const a = await askAgoda(tabId);
+    if (a && a.price) {
+      return { hotelId: h.id, hotelName: h.id, dates: [ciISO.slice(5), coISO.slice(5)], prices: { agoda: a.price }, source: "agoda" };
+    }
+  }
+  return await scrapeOnce(tabId, h.q, h.id, ts); // Agoda 失敗才試 Google
+}
+
+// 今日比價用：先 Google 抓；漏抓且有 Agoda slug 就改抓 Agoda 飯店頁
 async function scrapeWithFallback(tabId, h, ts, ciISO, coISO) {
   const d = await scrapeOnce(tabId, h.q, h.id, ts);
   if (d && d.prices && Object.keys(d.prices).length) return d;
@@ -356,7 +376,7 @@ async function runRangeScan(startISO, endISO) {
       for (const h of HOTELS) {
         done++;
         await progress(done, total, `${iso.slice(5)} · ${h.id}`, { ok: okCount });
-        const d = await scrapeWithFallback(win.tabId, h, ts, iso, coISO);
+        const d = await scrapeAgodaFirst(win.tabId, h, ts, iso, coISO);
         if (d && d.prices && Object.keys(d.prices).length) {
           days[iso][h.id] = Math.min(...Object.values(d.prices).filter((x) => typeof x === "number"));
           okCount++;
