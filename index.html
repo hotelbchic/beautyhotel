@@ -186,6 +186,7 @@
     <div class="tab" onclick="switchTab('trend')">📈 14天走勢圖</div>
     <div class="tab" onclick="switchTab('calendar')">📅 14天日曆價格表</div>
     <div class="tab" onclick="switchTab('history')">📉 歷史趨勢</div>
+    <div class="tab" onclick="switchTab('lookup')">📋 調閱歷史價格</div>
   </div>
 </div>
 
@@ -283,6 +284,31 @@
     <div class="chart-container"><canvas id="histChart"></canvas></div>
   </div>
   <div class="update-notice" id="histNotice">⏳ 載入歷史資料中…</div>
+</div>
+</div>
+
+<!-- TAB 5: 調閱歷史價格 -->
+<div class="tab-content" id="tab-lookup">
+<div class="section">
+  <div class="update-notice" style="background:#eef4ff;border-color:#3b6fe0;color:#1c47a8;">
+    📋 <strong>調閱某一天的完整房價</strong><br>
+    <span style="font-weight:normal;font-size:12px;">每天 09:30 排程抓完房價後，會自動把「今日比價」整張表存成一份快照。在這裡選日期，就能回看那天 10 間飯店的 3 OTA 房價。</span>
+  </div>
+  <div style="margin:14px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <label for="lookupDate" style="font-weight:700;font-size:14px;">選擇日期：</label>
+    <select id="lookupDate" onchange="renderLookup()" style="padding:8px 12px;font-size:14px;border-radius:8px;border:1px solid #ccc;min-width:200px;"></select>
+  </div>
+  <div id="lookupMeta" style="font-size:13px;color:#555;margin-bottom:10px;"></div>
+  <div class="table-wrap">
+    <div style="overflow-x:auto;">
+      <table id="lookupTable"><thead><tr>
+        <th style="min-width:160px;">飯店名稱</th>
+        <th>Agoda (NT$)</th><th>Trip.com (NT$)</th><th>Booking.com (NT$)</th>
+        <th>當天最低</th><th>vs 我們</th>
+      </tr></thead><tbody id="lookupBody"></tbody></table>
+    </div>
+  </div>
+  <div class="update-notice" id="lookupNotice">⏳ 載入歷史快照中…</div>
 </div>
 </div>
 
@@ -564,7 +590,7 @@ function highlightCalendarLowest(){
 // ===== TABS =====
 function switchTab(name){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const names=['today','trend','calendar','history'];
+    const names=['today','trend','calendar','history','lookup'];
     t.classList.toggle('active',names[i]===name);
   });
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
@@ -572,6 +598,7 @@ function switchTab(name){
   if(name==='trend'&&!trendChart){buildToggles();buildChart();}
   if(name==='calendar'){buildThirtyTable();}
   if(name==='history'&&!histChart){buildHistory();}
+  if(name==='lookup'&&!lookupLoaded){buildLookup();}
 }
 function setUpdateTime(){
   const n=new Date();
@@ -776,6 +803,84 @@ async function buildHistory(){
   }});
   const last=rows[rows.length-1];
   notice.innerHTML=`📊 共 ${rows.length} 天快照（最新 ${last.date}，入住日 ${last.snap.checkin||'?'}）。x 軸＝抓取日期，y 軸＝該飯店當天最低 OTA 價。`;
+}
+
+// ===== 調閱歷史價格 =====
+let lookupLoaded=false;
+let lookupSnaps={}; // date -> snapshot
+async function buildLookup(){
+  lookupLoaded=true;
+  const sel=document.getElementById('lookupDate');
+  const notice=document.getElementById('lookupNotice');
+  let dates=[];
+  try{
+    const r=await fetch('data/history/index.json?t='+Date.now(),{cache:'no-store'});
+    if(r.ok) dates=await r.json();
+  }catch(e){}
+  if(!Array.isArray(dates)||dates.length===0){
+    notice.innerHTML='📭 還沒有歷史快照。每天 09:30 排程（或手動「⚡ 一鍵全抓」推送）後，這裡就會累積每天一份。';
+    sel.innerHTML='<option>—</option>';
+    return;
+  }
+  dates=dates.slice().reverse(); // 最新的排前面
+  const snaps=await Promise.all(dates.map(async d=>{
+    try{const r=await fetch('data/history/'+d+'.json?t='+Date.now(),{cache:'no-store'});return r.ok?await r.json():null;}catch(e){return null;}
+  }));
+  sel.innerHTML='';
+  dates.forEach((d,i)=>{
+    if(!snaps[i]||!snaps[i].hotels)return;
+    lookupSnaps[d]=snaps[i];
+    const s=snaps[i];
+    const wd=s.dayOfWeek?`（${s.dayOfWeek}）`:'';
+    const ci=s.checkin?` · 入住 ${s.checkin}`:'';
+    const o=document.createElement('option');
+    o.value=d; o.textContent=`${d}${wd}${ci}`;
+    sel.appendChild(o);
+  });
+  if(!sel.options.length){notice.innerHTML='📭 索引存在但讀不到快照內容。';return;}
+  renderLookup();
+}
+function renderLookup(){
+  const sel=document.getElementById('lookupDate');
+  const date=sel.value;
+  const snap=lookupSnaps[date];
+  const body=document.getElementById('lookupBody');
+  const meta=document.getElementById('lookupMeta');
+  const notice=document.getElementById('lookupNotice');
+  if(!snap||!snap.hotels){body.innerHTML='';notice.innerHTML='讀不到這天的資料。';return;}
+  const minOf=(o)=>{if(!o)return null;const v=[o.agoda,o.trip,o.booking].filter(x=>typeof x==='number');return v.length?Math.min(...v):null;};
+  const ownMin=minOf(snap.hotels['own']);
+  // 找當天全區最低
+  let lowest=null,lowestName='';
+  hotels.forEach(h=>{const m=minOf(snap.hotels[h.id]);if(m!=null&&(lowest==null||m<lowest)){lowest=m;lowestName=h.name;}});
+  const fmt=v=>v==null?'<span style="color:#bbb;">—</span>':'NT$ '+v.toLocaleString();
+  const cell=(v,isMin)=>v==null?'<span style="color:#bbb;">—</span>':`${v.toLocaleString()}${isMin?' <span style="background:#e94560;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">最低</span>':''}`;
+  let html='';
+  hotels.forEach(h=>{
+    const o=snap.hotels[h.id]||{};
+    const m=minOf(o);
+    const prices=[o.agoda,o.trip,o.booking];
+    const minIdx=m==null?-1:prices.indexOf(m);
+    let vs='—';
+    if(m!=null&&ownMin!=null&&!h.own){
+      const d=m-ownMin;
+      vs=d===0?'<span style="color:#888;">同價</span>':(d>0?`<span style="color:#27ae60;font-weight:700;">+NT$${d.toLocaleString()}</span>`:`<span style="color:#e94560;font-weight:700;">−NT$${Math.abs(d).toLocaleString()}</span>`);
+    }
+    const isLowest=m!=null&&m===lowest;
+    html+=`<tr style="${h.own?'background:#fff5f6;':''}">
+      <td><strong style="color:${h.color};">${h.name}</strong>${h.own?' <span style="background:#e94560;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">我們</span>':''}<br><small style="color:#999;">${h.loc}</small></td>
+      <td>${cell(o.agoda,minIdx===0)}</td>
+      <td>${cell(o.trip,minIdx===1)}</td>
+      <td>${cell(o.booking,minIdx===2)}</td>
+      <td><strong>${fmt(m)}</strong>${isLowest?' <span style="background:#e94560;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">中山最低</span>':''}</td>
+      <td>${vs}</td>
+    </tr>`;
+  });
+  body.innerHTML=html;
+  const ci=snap.checkin?`入住 ${snap.checkin}`:'';
+  const wd=snap.dayOfWeek||'';
+  meta.innerHTML=`📅 <strong>${date}</strong> 抓取 ${wd?'（'+wd+'）':''} ${ci?'· '+ci:''}　｜　我們最低 <strong style="color:#e94560;">${fmt(ownMin)}</strong>　｜　中山最低 <strong>${fmt(lowest)}</strong>（${lowestName}）`;
+  notice.innerHTML=`✅ 這是 ${date} 09:30 排程抓到的真實房價快照。可從上方下拉切換其他日期。`;
 }
 
 // INIT
