@@ -312,23 +312,29 @@
   async function extractForBatch(expectedId, timeout) {
     const start = Date.now();
     let retried = 0;
+    let best = null, fromResult = null;
     while (Date.now() - start < timeout) {
       const retryBtn = Array.from(document.querySelectorAll("button, a")).find(
         (b) => (b.innerText || "").trim() === "再試一次"
       );
       if (retryBtn && retried < 2) { retryBtn.click(); retried++; await sleep(2500); continue; }
-      // (a) 詳細頁完整 3 OTA
+      // (a) 詳細頁 OTA：盡量等到「多家」都載出來再回傳(才有完整 3 OTA)
       const det = extractCurrent();
-      if (det.hotelId === expectedId && Object.keys(det.prices).length > 0) return det;
-      // (b) 搜尋卡片的 from 最低價
-      const from = fromPriceOf(expectedId);
-      const dates = extractDates();
-      if (from !== null && dates.length) {
-        return { hotelId: expectedId, hotelName: document.title, dates, prices: { agoda: from } };
+      if (det.hotelId === expectedId && Object.keys(det.prices).length > 0) {
+        if (!best || Object.keys(det.prices).length > Object.keys(best.prices).length) best = det;
+        if (Object.keys(best.prices).length >= 2) return best; // 已抓到 2 家以上，夠完整就回
+      }
+      // (b) 備用：搜尋卡片的 from 最低價(只有單一家時的退路)
+      if (!fromResult) {
+        const from = fromPriceOf(expectedId);
+        const dates = extractDates();
+        if (from !== null && dates.length) {
+          fromResult = { hotelId: expectedId, hotelName: document.title, dates, prices: { agoda: from } };
+        }
       }
       await sleep(700);
     }
-    return null;
+    return best || fromResult; // 等不到多家就回最好的(可能只有1家)或 from 價
   }
 
   // 背景引擎(background.js)叫我抓價：等價格載入(含「再試一次」)後回傳結果
