@@ -256,16 +256,22 @@ function buildSnapshot(checkin, scrapes) {
   return { schemaVersion: 1, lastUpdated: now.toISOString(), scrapeDate, checkin, checkout, dayOfWeek, isWeekend, source: "auto-batch", hotels };
 }
 
-async function autoPush() {
+async function autoPush(preferredCheckin) {
   const cfg = await getCfg();
   if (!cfg.token) return { ok: false, reason: "沒設定 GitHub Token，已抓到的資料留在擴充裡，可手動推送" };
   cfg.repo = cfg.repo || "hotelbchic/beautyhotel";
   cfg.branch = cfg.branch || "main";
   const scrapes = await getScrapes();
-  // 取「這次最常見的入住日」當這份快照的日期
-  const counts = {};
-  scrapes.forEach((e) => { if (e.checkin) counts[e.checkin] = (counts[e.checkin] || 0) + 1; });
-  const checkin = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  let checkin;
+  // 若呼叫端指定了入住日（如每日排程＝今天），就用它，避免被舊的區間資料蓋過
+  if (preferredCheckin && scrapes.some((e) => e.checkin === preferredCheckin)) {
+    checkin = preferredCheckin;
+  } else {
+    // 否則退回「最常見的入住日」
+    const counts = {};
+    scrapes.forEach((e) => { if (e.checkin) counts[e.checkin] = (counts[e.checkin] || 0) + 1; });
+    checkin = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  }
   if (!checkin) return { ok: false, reason: "沒有可推送的日期" };
   const snap = buildSnapshot(checkin, scrapes);
   const sd = snap.scrapeDate;
@@ -311,7 +317,9 @@ async function runAutoBatch() {
     await setStatus({ running: true, i: HOTELS.length, total: HOTELS.length, msg: "推送到 GitHub…", ok: ok.length, skip: skip.length, ts: Date.now() });
     let pushMsg;
     try {
-      const pr = await autoPush();
+      // 明確指定「今天入住」當這份快照的日期，避免被舊的區間掃描資料蓋過
+      const todayCheckin = `${String(ci0.m).padStart(2, "0")}-${String(ci0.d).padStart(2, "0")}`;
+      const pr = await autoPush(todayCheckin);
       pushMsg = pr.ok ? `已推送（入住日 ${pr.checkin}）手機開比價表即可看到` : `未推送：${pr.reason}`;
     } catch (e) {
       pushMsg = `推送失敗：${(e && e.message) || e}`;
