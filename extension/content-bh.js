@@ -76,14 +76,6 @@
       pollAuto();
     });
 
-    // 把頁面右上角原本的「🔄 即時比價」按鈕也接上一鍵全抓（裝了擴充才有此行為）
-    document.querySelectorAll(".header-tag").forEach((t) => {
-      if (t.textContent.includes("即時比價") && !t.dataset.bhHijacked) {
-        t.dataset.bhHijacked = "1";
-        t.setAttribute("title", "一鍵全抓 10 間 + 推送更新（擴充）");
-        t.addEventListener("click", (e) => { e.stopImmediatePropagation(); e.preventDefault(); triggerAuto(); }, true);
-      }
-    });
     let pollTimer = null;
     function pollAuto() {
       if (pollTimer) clearInterval(pollTimer);
