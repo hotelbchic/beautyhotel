@@ -427,6 +427,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ started: true });
     return;
   }
+  if (msg && msg.type === "setupAlarm") { setupDailyAlarm(); sendResponse({ ok: true }); return; }
 });
 
-chrome.runtime.onInstalled.addListener(() => console.log("beautyhotel-sync background ready"));
+// ===== 每天自動排程(chrome.alarms) =====
+// 預設啟用、每天 08:00 自動跑 runAutoBatch(抓今天10間 + 推雲端)。
+// 限制：這台電腦+Chrome 要開著、到時間才會跑。
+function setupDailyAlarm() {
+  chrome.storage.local.get(["bhConfig"], (r) => {
+    const cfg = r.bhConfig || {};
+    chrome.alarms.clear("bhDailyScan");
+    if (cfg.scheduleEnabled === false) return; // 關閉排程
+    const hour = (typeof cfg.scheduleHour === "number") ? cfg.scheduleHour : 9;     // 預設 09:30
+    const minute = (typeof cfg.scheduleMinute === "number") ? cfg.scheduleMinute : 30;
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+    if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1); // 今天該時間已過 → 明天
+    chrome.alarms.create("bhDailyScan", { when: next.getTime(), periodInMinutes: 1440 }); // 每天
+  });
+}
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === "bhDailyScan") runAutoBatch(); // 自動抓今天 + 推雲端
+});
+chrome.runtime.onStartup.addListener(setupDailyAlarm);
+chrome.runtime.onInstalled.addListener(() => {
+  console.log("beautyhotel-sync background ready");
+  // 首次安裝/更新時，若還沒設定過排程，預設開啟每天 8 點
+  chrome.storage.local.get(["bhConfig"], (r) => {
+    const cfg = r.bhConfig || {};
+    if (cfg.scheduleEnabled === undefined) {
+      cfg.scheduleEnabled = true;
+      if (typeof cfg.scheduleHour !== "number") cfg.scheduleHour = 9;
+      if (typeof cfg.scheduleMinute !== "number") cfg.scheduleMinute = 30;
+      chrome.storage.local.set({ bhConfig: cfg }, setupDailyAlarm);
+    } else {
+      setupDailyAlarm();
+    }
+  });
+});

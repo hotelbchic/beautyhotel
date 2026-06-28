@@ -228,6 +228,30 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   $("push").onclick = doPush;
   $("saveCfg").onclick = saveCfg;
+
+  // ---- 每天自動排程 ----
+  chrome.storage.local.get(["bhConfig"], (r) => {
+    const c = r.bhConfig || {};
+    $("schedOn").checked = c.scheduleEnabled !== false;
+    const hh = String(typeof c.scheduleHour === "number" ? c.scheduleHour : 9).padStart(2, "0");
+    const mm = String(typeof c.scheduleMinute === "number" ? c.scheduleMinute : 30).padStart(2, "0");
+    $("schedTime").value = `${hh}:${mm}`;
+  });
+  $("schedSave").onclick = () => {
+    const [hh, mm] = ($("schedTime").value || "09:30").split(":").map(Number);
+    chrome.storage.local.get(["bhConfig"], (r) => {
+      const c = r.bhConfig || {};
+      c.scheduleEnabled = $("schedOn").checked;
+      c.scheduleHour = hh; c.scheduleMinute = mm;
+      chrome.storage.local.set({ bhConfig: c }, () => {
+        chrome.runtime.sendMessage({ type: "setupAlarm" }, () => {
+          setStatus($("schedStatus"), c.scheduleEnabled ? `✅ 已設定每天 ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")} 自動抓` : "⏸ 已關閉自動排程", "ok");
+          setTimeout(() => clearStatus($("schedStatus")), 3000);
+        });
+      });
+    });
+  };
+
   loadCfgToForm();
   render();
 });

@@ -41,6 +41,20 @@
   <button id="auto" style="background:linear-gradient(135deg,#27ae60,#2ecc71);font-size:14px;padding:12px;">⚡ 一鍵全抓 10 間 + 推送</button>
   <div id="autoStatus" class="status"></div>
 
+  <!-- 每天自動排程 -->
+  <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+    <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:#fff;cursor:pointer;">
+      <input type="checkbox" id="schedOn" style="width:auto;"> ⏰ 每天自動抓房價
+    </label>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+      <span style="font-size:12px;color:rgba(255,255,255,.7);">時間</span>
+      <input type="time" id="schedTime" value="09:30" style="flex:1;">
+      <button id="schedSave" class="secondary" style="width:auto;padding:6px 12px;margin:0;">儲存</button>
+    </div>
+    <div class="hint" style="margin-top:4px;">需這台電腦+Chrome 開著才會跑；會彈視窗自動抓再推雲端</div>
+    <div id="schedStatus" class="status"></div>
+  </div>
+
   <div class="stat">
     <div class="n" id="count">0</div>
     <div class="l">已抓取筆數 (hotel × 日期)</div>
