@@ -316,20 +316,17 @@
 <div class="tab-content" id="tab-mlookup">
 <div class="section">
   <div class="update-notice" style="background:#eef4ff;border-color:#3b6fe0;color:#1c47a8;">
-    📆 <strong>調閱「14 天日曆」的某一天</strong><br>
-    <span style="font-weight:normal;font-size:12px;">凡是用擴充「📅 抓區間（更新日曆）」抓過的日期，都會留在這裡。選一個入住日期，就能看那天 10 間飯店的房價（日曆只存「當天最低價」，所以是單一價格）。</span>
+    📆 <strong>調閱某次「14 天日曆」整張表</strong><br>
+    <span style="font-weight:normal;font-size:12px;">每次用擴充「📅 抓區間（更新日曆）」抓完，就會把整張多日表存一份。選一個查詢日期，就能回看那次抓到的完整多日房價表（日曆只存當天最低價）。</span>
   </div>
   <div style="margin:14px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <label for="mlookupDate" style="font-weight:700;font-size:14px;">選擇入住日：</label>
+    <label for="mlookupDate" style="font-weight:700;font-size:14px;">選擇查詢日期：</label>
     <select id="mlookupDate" onchange="renderMLookup()" style="padding:8px 12px;font-size:14px;border-radius:8px;border:1px solid #ccc;min-width:200px;"></select>
   </div>
   <div id="mlookupMeta" style="font-size:13px;color:#555;margin-bottom:10px;"></div>
-  <div class="table-wrap">
+  <div class="thirty-table-wrap">
     <div style="overflow-x:auto;">
-      <table id="mlookupTable"><thead><tr>
-        <th style="min-width:160px;">飯店名稱</th>
-        <th>當天最低價 (NT$)</th><th>vs 我們</th>
-      </tr></thead><tbody id="mlookupBody"></tbody></table>
+      <table id="mlookupTable" class="thirty-table"></table>
     </div>
   </div>
   <div class="update-notice" id="mlookupNotice">⏳ 載入日曆資料中…</div>
@@ -908,68 +905,86 @@ function renderLookup(){
   notice.innerHTML=`✅ 這是 ${date} 09:30 排程抓到的真實房價快照。可從上方下拉切換其他日期。`;
 }
 
-// ===== 調閱多日歷史價格（14天日曆逐日）=====
+// ===== 調閱多日歷史價格（回看某次抓的整張 14 天日曆）=====
 let mlookupLoaded=false;
-let mlookupDays=null; // {date:{id:price}}
+let mlookupSnaps={}; // 查詢日 -> 整份日曆快照(含 .days)
 async function buildMLookup(){
   mlookupLoaded=true;
   const sel=document.getElementById('mlookupDate');
   const notice=document.getElementById('mlookupNotice');
-  let cal=null;
+  let qDates=[];
   try{
-    const r=await fetch('data/calendar.json?t='+Date.now(),{cache:'no-store'});
-    if(r.ok) cal=await r.json();
+    const r=await fetch('data/calendar-history/index.json?t='+Date.now(),{cache:'no-store'});
+    if(r.ok) qDates=await r.json();
   }catch(e){}
-  const days=cal&&cal.days?cal.days:null;
-  const dates=days?Object.keys(days).sort():[];
-  if(!dates.length){
-    notice.innerHTML='📭 還沒有日曆查詢紀錄。用擴充「📅 抓區間（更新日曆）」抓過一段日期後，這裡就會出現可調閱的日期。';
+  if(Array.isArray(qDates)&&qDates.length){
+    const snaps=await Promise.all(qDates.map(async d=>{
+      try{const r=await fetch('data/calendar-history/'+d+'.json?t='+Date.now(),{cache:'no-store'});return r.ok?await r.json():null;}catch(e){return null;}
+    }));
+    qDates.forEach((d,i)=>{ if(snaps[i]&&snaps[i].days) mlookupSnaps[d]=snaps[i]; });
+  }
+  // 退路：還沒有歷史索引，就把目前的 calendar.json 當作最新一筆
+  if(!Object.keys(mlookupSnaps).length){
+    try{
+      const r=await fetch('data/calendar.json?t='+Date.now(),{cache:'no-store'});
+      if(r.ok){const c=await r.json(); if(c&&c.days){const key=(c.lastUpdated?c.lastUpdated.slice(0,10):(c.rangeStart||'最新')); mlookupSnaps[key]=c;}}
+    }catch(e){}
+  }
+  const keys=Object.keys(mlookupSnaps).sort().reverse(); // 新的在前
+  if(!keys.length){
+    notice.innerHTML='📭 還沒有日曆查詢紀錄。用擴充「📅 抓區間（更新日曆）」抓過一段日期後，這裡就會出現可調閱的查詢日。';
     sel.innerHTML='<option>—</option>';
     return;
   }
-  mlookupDays=days;
   sel.innerHTML='';
   const wdName=['週日','週一','週二','週三','週四','週五','週六'];
-  dates.forEach(d=>{
-    const dt=new Date(d+'T00:00:00');
-    const o=document.createElement('option');
-    o.value=d; o.textContent=`${d}（${wdName[dt.getDay()]}）`;
+  keys.forEach(d=>{
+    const o=document.createElement('option'); o.value=d;
+    const dt=/^\d{4}-\d{2}-\d{2}$/.test(d)?new Date(d+'T00:00:00'):null;
+    o.textContent=dt?`${d}（${wdName[dt.getDay()]}）查詢`:`${d}`;
     sel.appendChild(o);
   });
   renderMLookup();
 }
 function renderMLookup(){
   const sel=document.getElementById('mlookupDate');
-  const date=sel.value;
-  const day=mlookupDays&&mlookupDays[date];
-  const body=document.getElementById('mlookupBody');
+  const qd=sel.value;
+  const snap=mlookupSnaps[qd];
+  const table=document.getElementById('mlookupTable');
   const meta=document.getElementById('mlookupMeta');
   const notice=document.getElementById('mlookupNotice');
-  if(!day){body.innerHTML='';notice.innerHTML='讀不到這天的資料。';return;}
-  const ownP=typeof day['own']==='number'?day['own']:null;
-  let lowest=null,lowestName='';
-  hotels.forEach(h=>{const p=day[h.id];if(typeof p==='number'&&(lowest==null||p<lowest)){lowest=p;lowestName=h.name;}});
-  const fmt=v=>v==null?'<span style="color:#bbb;">—</span>':'NT$ '+v.toLocaleString();
-  let html='';
-  hotels.forEach(h=>{
-    const p=typeof day[h.id]==='number'?day[h.id]:null;
-    let vs='—';
-    if(p!=null&&ownP!=null&&!h.own){
-      const d=p-ownP;
-      vs=d===0?'<span style="color:#888;">同價</span>':(d>0?`<span style="color:#27ae60;font-weight:700;">+NT$${d.toLocaleString()}</span>`:`<span style="color:#e94560;font-weight:700;">−NT$${Math.abs(d).toLocaleString()}</span>`);
-    }
-    const isLowest=p!=null&&p===lowest;
-    html+=`<tr style="${h.own?'background:#fff5f6;':''}">
-      <td><strong style="color:${h.color};">${h.name}</strong>${h.own?' <span style="background:#e94560;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">我們</span>':''}<br><small style="color:#999;">${h.loc}</small></td>
-      <td><strong>${fmt(p)}</strong>${isLowest?' <span style="background:#e94560;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">中山最低</span>':''}</td>
-      <td>${vs}</td>
-    </tr>`;
+  if(!snap||!snap.days){table.innerHTML='';notice.innerHTML='讀不到這次查詢的資料。';return;}
+  const days=snap.days;
+  const cols=Object.keys(days).sort();
+  const wdName=['週日','週一','週二','週三','週四','週五','週六'];
+  const isWk=(d)=>{const g=new Date(d+'T00:00:00').getDay();return g===5||g===6;};
+  // 每欄最低價（標中山最低）
+  const colMin={};
+  cols.forEach(d=>{let mn=null;hotels.forEach(h=>{const v=days[d][h.id];if(typeof v==='number'&&(mn==null||v<mn))mn=v;});colMin[d]=mn;});
+  // header
+  let head='<thead><tr><th style="min-width:130px;text-align:left;">飯店 / 入住日</th>';
+  cols.forEach(d=>{
+    const md=d.slice(5).replace('-','/');
+    head+=`<th style="min-width:64px;${isWk(d)?'background:#fff3ec;':''}">${md}<br><span style="color:${isWk(d)?'#e94560':'#aaa'};font-size:10px;">${wdName[new Date(d+'T00:00:00').getDay()]}</span></th>`;
   });
-  body.innerHTML=html;
-  const dt=new Date(date+'T00:00:00');
-  const wd=['週日','週一','週二','週三','週四','週五','週六'][dt.getDay()];
-  meta.innerHTML=`📆 入住 <strong>${date}（${wd}）</strong>　｜　我們 <strong style="color:#e94560;">${fmt(ownP)}</strong>　｜　中山最低 <strong>${fmt(lowest)}</strong>（${lowestName}）`;
-  notice.innerHTML=`✅ 這是「14 天日曆」抓到的 ${date} 真實房價（每間取當天最低 OTA 價）。可從上方下拉切換其他日期。`;
+  head+='</tr></thead>';
+  // body
+  let body='<tbody>';
+  hotels.forEach(h=>{
+    body+=`<tr style="${h.own?'background:#fff5f6;':''}"><td style="text-align:left;white-space:nowrap;"><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:${h.color};display:inline-block;"></span>${h.name}${h.own?'<span style="background:#e94560;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:800;">我們</span>':''}</span></td>`;
+    cols.forEach(d=>{
+      const v=days[d][h.id];
+      const txt=typeof v==='number'?v.toLocaleString():'<span style="color:#ccc;">—</span>';
+      const isMin=typeof v==='number'&&v===colMin[d];
+      body+=`<td style="${isWk(d)?'background:#fff8f0;':''}${isMin?'color:#e94560;font-weight:800;':''}${h.own?'font-weight:700;':''}">${txt}</td>`;
+    });
+    body+='</tr>';
+  });
+  body+='</tbody>';
+  table.innerHTML=head+body;
+  const rs=snap.rangeStart||cols[0], re=snap.rangeEnd||cols[cols.length-1];
+  meta.innerHTML=`📆 查詢日 <strong>${qd}</strong>　｜　區間 <strong>${rs} ~ ${re}</strong>　｜　共 ${cols.length} 天 × ${hotels.length} 間（紅字＝該日中山最低，橘底＝週末）`;
+  notice.innerHTML=`✅ 這是 ${qd} 那次「📅 抓區間」抓到的整張 14 天日曆（每間取當天最低 OTA 價）。可從上方下拉切換其他查詢日。`;
 }
 
 // INIT

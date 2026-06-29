@@ -417,6 +417,15 @@ async function runRangeScan(startISO, endISO) {
         const obj = { schemaVersion: 2, version: Date.now(), lastUpdated: new Date().toISOString(),
           rangeStart: allDates[0] || startISO, rangeEnd: allDates[allDates.length - 1] || dateList[dateList.length - 1], days: mergedDays };
         await ghPut("data/calendar.json", obj, `data: 區間房價合併 ${startISO}~${dateList[dateList.length - 1]} (auto)`, cfg);
+        // 另存一份「以查詢日命名」的整張表快照，給比價表「📆 調閱多日歷史價格」回看
+        try {
+          await ghPut(`data/calendar-history/${todayStr}.json`, obj, `data: 多日歷史快照 ${todayStr} (auto)`, cfg);
+          const cidx = await ghGetSha("data/calendar-history/index.json", cfg);
+          const clist = Array.isArray(cidx.json) ? cidx.json : [];
+          if (!clist.includes(todayStr)) clist.push(todayStr);
+          clist.sort();
+          await ghPut("data/calendar-history/index.json", clist, `data: 更新多日歷史索引 ${todayStr} (auto)`, cfg, cidx.sha);
+        } catch (e) {}
         // 注意：區間掃描只更新 14天日曆，不碰今日比價(今日比價的 3 OTA 由「一鍵全抓」負責，
         // 避免區間的 Agoda 單價蓋掉今日的三家價)
         pushMsg = "已推送(合併)，14天日曆更新(今日比價請用一鍵全抓)";
