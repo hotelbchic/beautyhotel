@@ -133,7 +133,7 @@ function askContent(tabId, payload, tries = 10) {
     attempt();
   });
 }
-const askExtract = (tabId, expectedId) => askContent(tabId, { type: "extractNow", expectedId });
+const askExtract = (tabId, expectedId, wantAll) => askContent(tabId, { type: "extractNow", expectedId, wantAll: !!wantAll });
 const askSetDate = (tabId) => askContent(tabId, { type: "setDateToday" });
 
 // Google 常漏抓的飯店 → 用 Agoda 飯店頁直連補（slug 已驗證）
@@ -168,8 +168,8 @@ async function scrapeAgodaFirst(tabId, h, ts, ciISO, coISO) {
 }
 
 // 今日比價用：先 Google 抓；漏抓且有 Agoda slug 就改抓 Agoda 飯店頁
-async function scrapeWithFallback(tabId, h, ts, ciISO, coISO) {
-  const d = await scrapeOnce(tabId, h.q, h.id, ts);
+async function scrapeWithFallback(tabId, h, ts, ciISO, coISO, wantAll) {
+  const d = await scrapeOnce(tabId, h.q, h.id, ts, wantAll);
   if (d && d.prices && Object.keys(d.prices).length) return d;
   if (AGODA_PATHS[h.id]) {
     await chrome.tabs.update(tabId, { url: agodaURL(AGODA_PATHS[h.id], ciISO, coISO) });
@@ -184,19 +184,22 @@ async function scrapeWithFallback(tabId, h, ts, ciISO, coISO) {
 }
 
 // 導航到某飯店該日 → 抓價；抓不到(載慢/504)就重載重試一次
-async function scrapeOnce(tabId, q, expectedId, ts) {
+async function scrapeOnce(tabId, q, expectedId, ts, wantAll) {
   const url = gtURL(q, ts);
   await chrome.tabs.update(tabId, { url });
   await waitTabComplete(tabId);
   await sleep(3000);
-  let d = await askExtract(tabId, expectedId);
-  if (!d || !d.prices || !Object.keys(d.prices).length) {
-    // 重載再試一次（對付 504 / 載入太慢）
+  let d = await askExtract(tabId, expectedId, wantAll);
+  // 自家要 3 平台：抓不到、或還沒湊滿 3 家，就重載再試一次
+  const enough = (x) => x && x.prices && Object.keys(x.prices).length >= (wantAll ? 3 : 1);
+  if (!enough(d)) {
     await sleep(2500);
     await chrome.tabs.update(tabId, { url: url + "&_r=1" });
     await waitTabComplete(tabId);
     await sleep(4000);
-    d = await askExtract(tabId, expectedId);
+    const d2 = await askExtract(tabId, expectedId, wantAll);
+    // 取平台數較多的那次
+    if (d2 && d2.prices && (!d || Object.keys(d2.prices).length > Object.keys(d.prices || {}).length)) d = d2;
   }
   return d;
 }
@@ -302,7 +305,8 @@ async function runAutoBatch() {
     for (let i = 0; i < HOTELS.length; i++) {
       const h = HOTELS[i];
       await progress(i + 1, HOTELS.length, `搜尋 ${h.id}（今天）…`, { ok: ok.length, skip: skip.length });
-      const d = await scrapeWithFallback(win.tabId, h, ts, ciISO, coISO);
+      // 自家峻美(own)要求湊滿 Agoda/Trip/Booking 三平台
+      const d = await scrapeWithFallback(win.tabId, h, ts, ciISO, coISO, h.id === "own");
       if (d && d.hotelId && d.prices && Object.keys(d.prices).length) {
         const n = await storeScrape(d);
         ok.push(h.id);

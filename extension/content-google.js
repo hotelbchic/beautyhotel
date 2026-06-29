@@ -309,10 +309,11 @@
     return lowest;
   }
   // 給 auto-batch 用：先試詳細頁 3 OTA，否則退回搜尋卡片的 from 價；含「再試一次」重試
-  async function extractForBatch(expectedId, timeout) {
+  async function extractForBatch(expectedId, timeout, wantAll) {
     const start = Date.now();
     let retried = 0;
     let best = null, fromResult = null;
+    const need = wantAll ? 3 : 2; // 自家峻美要求湊滿 3 個平台才提早回傳
     while (Date.now() - start < timeout) {
       const retryBtn = Array.from(document.querySelectorAll("button, a")).find(
         (b) => (b.innerText || "").trim() === "再試一次"
@@ -322,7 +323,7 @@
       const det = extractCurrent();
       if (det.hotelId === expectedId && Object.keys(det.prices).length > 0) {
         if (!best || Object.keys(det.prices).length > Object.keys(best.prices).length) best = det;
-        if (Object.keys(best.prices).length >= 2) return best; // 已抓到 2 家以上，夠完整就回
+        if (Object.keys(best.prices).length >= need) return best; // 抓到足夠平台數就回
       }
       // (b) 備用：搜尋卡片的 from 最低價(只有單一家時的退路)
       if (!fromResult) {
@@ -341,7 +342,8 @@
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.type === "extractNow") {
       (async () => {
-        const d = await extractForBatch(msg.expectedId, 16000);
+        // 自家(wantAll)要湊滿 3 平台，給更長的等待時間
+        const d = await extractForBatch(msg.expectedId, msg.wantAll ? 26000 : 16000, msg.wantAll);
         sendResponse(d || null);
       })();
       return true; // 非同步回覆，保持通道
