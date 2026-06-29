@@ -46,7 +46,7 @@
     const rangeHint = root.querySelector("#bh-range-hint");
     const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const _today = new Date();
-    const _wk = new Date(_today.getTime() + 6 * 86400000);
+    const _wk = new Date(_today.getTime() + 13 * 86400000); // 當日起往後 14 天(含當日)
     if (startInp) { startInp.value = isoOf(_today); startInp.min = isoOf(_today); }
     if (endInp) { endInp.value = isoOf(_wk); endInp.min = isoOf(_today); }
     function rangeDays() {

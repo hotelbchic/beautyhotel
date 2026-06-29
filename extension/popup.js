@@ -236,6 +236,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const hh = String(typeof c.scheduleHour === "number" ? c.scheduleHour : 9).padStart(2, "0");
     const mm = String(typeof c.scheduleMinute === "number" ? c.scheduleMinute : 30).padStart(2, "0");
     $("schedTime").value = `${hh}:${mm}`;
+    // 14 天日曆排程
+    $("rangeSchedOn").checked = !!c.rangeScheduleEnabled;
+    $("rangeSchedDays").value = (typeof c.rangeScheduleDays === "number" && c.rangeScheduleDays > 0) ? c.rangeScheduleDays : 3;
+    const rhh = String(typeof c.rangeScheduleHour === "number" ? c.rangeScheduleHour : 3).padStart(2, "0");
+    const rmm = String(typeof c.rangeScheduleMinute === "number" ? c.rangeScheduleMinute : 0).padStart(2, "0");
+    $("rangeSchedTime").value = `${rhh}:${rmm}`;
   });
   $("schedSave").onclick = () => {
     const [hh, mm] = ($("schedTime").value || "09:30").split(":").map(Number);
@@ -245,8 +251,23 @@ document.addEventListener("DOMContentLoaded", () => {
       c.scheduleHour = hh; c.scheduleMinute = mm;
       chrome.storage.local.set({ bhConfig: c }, () => {
         chrome.runtime.sendMessage({ type: "setupAlarm" }, () => {
-          setStatus($("schedStatus"), c.scheduleEnabled ? `✅ 已設定每天 ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")} 自動抓` : "⏸ 已關閉自動排程", "ok");
+          setStatus($("schedStatus"), c.scheduleEnabled ? `✅ 已設定每天 ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")} 自動抓今日比價` : "⏸ 已關閉今日比價排程", "ok");
           setTimeout(() => clearStatus($("schedStatus")), 3000);
+        });
+      });
+    });
+  };
+  $("rangeSchedSave").onclick = () => {
+    const [hh, mm] = ($("rangeSchedTime").value || "03:00").split(":").map(Number);
+    const days = Math.max(1, Math.min(30, parseInt($("rangeSchedDays").value) || 3));
+    chrome.storage.local.get(["bhConfig"], (r) => {
+      const c = r.bhConfig || {};
+      c.rangeScheduleEnabled = $("rangeSchedOn").checked;
+      c.rangeScheduleHour = hh; c.rangeScheduleMinute = mm; c.rangeScheduleDays = days;
+      chrome.storage.local.set({ bhConfig: c }, () => {
+        chrome.runtime.sendMessage({ type: "setupAlarm" }, () => {
+          setStatus($("rangeSchedStatus"), c.rangeScheduleEnabled ? `✅ 已設定每 ${days} 天 ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")} 自動抓 14 天日曆` : "⏸ 已關閉 14 天日曆排程", "ok");
+          setTimeout(() => clearStatus($("rangeSchedStatus")), 3500);
         });
       });
     });

@@ -41,18 +41,34 @@
   <button id="auto" style="background:linear-gradient(135deg,#27ae60,#2ecc71);font-size:14px;padding:12px;">⚡ 一鍵全抓 10 間 + 推送</button>
   <div id="autoStatus" class="status"></div>
 
-  <!-- 每天自動排程 -->
+  <!-- 每天自動排程：今日比價 -->
   <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
     <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:#fff;cursor:pointer;">
-      <input type="checkbox" id="schedOn" style="width:auto;"> ⏰ 每天自動抓房價
+      <input type="checkbox" id="schedOn" style="width:auto;"> ⏰ 每天自動抓今日比價
     </label>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
       <span style="font-size:12px;color:rgba(255,255,255,.7);">時間</span>
       <input type="time" id="schedTime" value="09:30" style="flex:1;">
       <button id="schedSave" class="secondary" style="width:auto;padding:6px 12px;margin:0;">儲存</button>
     </div>
-    <div class="hint" style="margin-top:4px;">需這台電腦+Chrome 開著才會跑；會彈視窗自動抓再推雲端</div>
+    <div class="hint" style="margin-top:4px;">每天抓今天 10 間 3 OTA（約 2 分鐘）；需電腦+Chrome 開著</div>
     <div id="schedStatus" class="status"></div>
+  </div>
+
+  <!-- 每 N 天自動排程：14 天日曆 -->
+  <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+    <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:#fff;cursor:pointer;">
+      <input type="checkbox" id="rangeSchedOn" style="width:auto;"> 📅 自動抓 14 天日曆
+    </label>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+      <span style="font-size:12px;color:rgba(255,255,255,.7);">每</span>
+      <input type="number" id="rangeSchedDays" value="3" min="1" max="30" style="width:50px;text-align:center;">
+      <span style="font-size:12px;color:rgba(255,255,255,.7);">天</span>
+      <input type="time" id="rangeSchedTime" value="03:00" style="flex:1;">
+      <button id="rangeSchedSave" class="secondary" style="width:auto;padding:6px 12px;margin:0;">儲存</button>
+    </div>
+    <div class="hint" style="margin-top:4px;">當日起往後 14 天 × 10 間（約 20 分鐘），建議半夜跑</div>
+    <div id="rangeSchedStatus" class="status"></div>
   </div>
 
   <div class="stat">
