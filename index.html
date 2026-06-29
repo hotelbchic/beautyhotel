@@ -186,6 +186,7 @@
     <div class="tab" onclick="switchTab('calendar')">📅 14天日曆價格表</div>
     <div class="tab" onclick="switchTab('history')">📉 歷史趨勢</div>
     <div class="tab" onclick="switchTab('lookup')">📋 調閱歷史價格</div>
+    <div class="tab" onclick="switchTab('mlookup')">📆 調閱多日歷史價格</div>
   </div>
 </div>
 
@@ -308,6 +309,30 @@
     </div>
   </div>
   <div class="update-notice" id="lookupNotice">⏳ 載入歷史快照中…</div>
+</div>
+</div>
+
+<!-- TAB 6: 調閱多日歷史價格（14天日曆的逐日紀錄） -->
+<div class="tab-content" id="tab-mlookup">
+<div class="section">
+  <div class="update-notice" style="background:#eef4ff;border-color:#3b6fe0;color:#1c47a8;">
+    📆 <strong>調閱「14 天日曆」的某一天</strong><br>
+    <span style="font-weight:normal;font-size:12px;">凡是用擴充「📅 抓區間（更新日曆）」抓過的日期，都會留在這裡。選一個入住日期，就能看那天 10 間飯店的房價（日曆只存「當天最低價」，所以是單一價格）。</span>
+  </div>
+  <div style="margin:14px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <label for="mlookupDate" style="font-weight:700;font-size:14px;">選擇入住日：</label>
+    <select id="mlookupDate" onchange="renderMLookup()" style="padding:8px 12px;font-size:14px;border-radius:8px;border:1px solid #ccc;min-width:200px;"></select>
+  </div>
+  <div id="mlookupMeta" style="font-size:13px;color:#555;margin-bottom:10px;"></div>
+  <div class="table-wrap">
+    <div style="overflow-x:auto;">
+      <table id="mlookupTable"><thead><tr>
+        <th style="min-width:160px;">飯店名稱</th>
+        <th>當天最低價 (NT$)</th><th>vs 我們</th>
+      </tr></thead><tbody id="mlookupBody"></tbody></table>
+    </div>
+  </div>
+  <div class="update-notice" id="mlookupNotice">⏳ 載入日曆資料中…</div>
 </div>
 </div>
 
@@ -589,7 +614,7 @@ function highlightCalendarLowest(){
 // ===== TABS =====
 function switchTab(name){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const names=['today','trend','calendar','history','lookup'];
+    const names=['today','trend','calendar','history','lookup','mlookup'];
     t.classList.toggle('active',names[i]===name);
   });
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
@@ -598,6 +623,7 @@ function switchTab(name){
   if(name==='calendar'){buildThirtyTable();}
   if(name==='history'&&!histChart){buildHistory();}
   if(name==='lookup'&&!lookupLoaded){buildLookup();}
+  if(name==='mlookup'&&!mlookupLoaded){buildMLookup();}
 }
 function setUpdateTime(){
   const n=new Date();
@@ -880,6 +906,70 @@ function renderLookup(){
   const wd=snap.dayOfWeek||'';
   meta.innerHTML=`📅 <strong>${date}</strong> 抓取 ${wd?'（'+wd+'）':''} ${ci?'· '+ci:''}　｜　我們最低 <strong style="color:#e94560;">${fmt(ownMin)}</strong>　｜　中山最低 <strong>${fmt(lowest)}</strong>（${lowestName}）`;
   notice.innerHTML=`✅ 這是 ${date} 09:30 排程抓到的真實房價快照。可從上方下拉切換其他日期。`;
+}
+
+// ===== 調閱多日歷史價格（14天日曆逐日）=====
+let mlookupLoaded=false;
+let mlookupDays=null; // {date:{id:price}}
+async function buildMLookup(){
+  mlookupLoaded=true;
+  const sel=document.getElementById('mlookupDate');
+  const notice=document.getElementById('mlookupNotice');
+  let cal=null;
+  try{
+    const r=await fetch('data/calendar.json?t='+Date.now(),{cache:'no-store'});
+    if(r.ok) cal=await r.json();
+  }catch(e){}
+  const days=cal&&cal.days?cal.days:null;
+  const dates=days?Object.keys(days).sort():[];
+  if(!dates.length){
+    notice.innerHTML='📭 還沒有日曆查詢紀錄。用擴充「📅 抓區間（更新日曆）」抓過一段日期後，這裡就會出現可調閱的日期。';
+    sel.innerHTML='<option>—</option>';
+    return;
+  }
+  mlookupDays=days;
+  sel.innerHTML='';
+  const wdName=['週日','週一','週二','週三','週四','週五','週六'];
+  dates.forEach(d=>{
+    const dt=new Date(d+'T00:00:00');
+    const o=document.createElement('option');
+    o.value=d; o.textContent=`${d}（${wdName[dt.getDay()]}）`;
+    sel.appendChild(o);
+  });
+  renderMLookup();
+}
+function renderMLookup(){
+  const sel=document.getElementById('mlookupDate');
+  const date=sel.value;
+  const day=mlookupDays&&mlookupDays[date];
+  const body=document.getElementById('mlookupBody');
+  const meta=document.getElementById('mlookupMeta');
+  const notice=document.getElementById('mlookupNotice');
+  if(!day){body.innerHTML='';notice.innerHTML='讀不到這天的資料。';return;}
+  const ownP=typeof day['own']==='number'?day['own']:null;
+  let lowest=null,lowestName='';
+  hotels.forEach(h=>{const p=day[h.id];if(typeof p==='number'&&(lowest==null||p<lowest)){lowest=p;lowestName=h.name;}});
+  const fmt=v=>v==null?'<span style="color:#bbb;">—</span>':'NT$ '+v.toLocaleString();
+  let html='';
+  hotels.forEach(h=>{
+    const p=typeof day[h.id]==='number'?day[h.id]:null;
+    let vs='—';
+    if(p!=null&&ownP!=null&&!h.own){
+      const d=p-ownP;
+      vs=d===0?'<span style="color:#888;">同價</span>':(d>0?`<span style="color:#27ae60;font-weight:700;">+NT$${d.toLocaleString()}</span>`:`<span style="color:#e94560;font-weight:700;">−NT$${Math.abs(d).toLocaleString()}</span>`);
+    }
+    const isLowest=p!=null&&p===lowest;
+    html+=`<tr style="${h.own?'background:#fff5f6;':''}">
+      <td><strong style="color:${h.color};">${h.name}</strong>${h.own?' <span style="background:#e94560;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">我們</span>':''}<br><small style="color:#999;">${h.loc}</small></td>
+      <td><strong>${fmt(p)}</strong>${isLowest?' <span style="background:#e94560;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">中山最低</span>':''}</td>
+      <td>${vs}</td>
+    </tr>`;
+  });
+  body.innerHTML=html;
+  const dt=new Date(date+'T00:00:00');
+  const wd=['週日','週一','週二','週三','週四','週五','週六'][dt.getDay()];
+  meta.innerHTML=`📆 入住 <strong>${date}（${wd}）</strong>　｜　我們 <strong style="color:#e94560;">${fmt(ownP)}</strong>　｜　中山最低 <strong>${fmt(lowest)}</strong>（${lowestName}）`;
+  notice.innerHTML=`✅ 這是「14 天日曆」抓到的 ${date} 真實房價（每間取當天最低 OTA 價）。可從上方下拉切換其他日期。`;
 }
 
 // INIT
