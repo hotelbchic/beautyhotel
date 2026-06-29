@@ -311,7 +311,7 @@
   // 給 auto-batch 用：先試詳細頁 3 OTA，否則退回搜尋卡片的 from 價；含「再試一次」重試
   async function extractForBatch(expectedId, timeout, wantAll) {
     const start = Date.now();
-    let retried = 0;
+    let retried = 0, clicks = 0;
     let best = null, fromResult = null;
     const need = wantAll ? 3 : 2; // 自家峻美要求湊滿 3 個平台才提早回傳
     while (Date.now() - start < timeout) {
@@ -321,9 +321,15 @@
       if (retryBtn && retried < 2) { retryBtn.click(); retried++; await sleep(2500); continue; }
       // (a) 詳細頁 OTA：盡量等到「多家」都載出來再回傳(才有完整 3 OTA)
       const det = extractCurrent();
-      if (det.hotelId === expectedId && Object.keys(det.prices).length > 0) {
-        if (!best || Object.keys(det.prices).length > Object.keys(best.prices).length) best = det;
+      const detN = det ? Object.keys(det.prices).length : 0;
+      if (det.hotelId === expectedId && detN > 0) {
+        if (!best || detN > Object.keys(best.prices).length) best = det;
         if (Object.keys(best.prices).length >= need) return best; // 抓到足夠平台數就回
+      }
+      // (a2) 平台數還不夠 → 可能停在搜尋清單頁(只有 from 價)，點開該飯店卡片打開「造訪網站」3 OTA 面板
+      if ((Object.keys((best && best.prices) || {}).length < need) && clicks < 3) {
+        const card = findSidebarCards().find((c) => c.id === expectedId);
+        if (card && card.el) { card.el.click(); clicks++; await sleep(3500); continue; }
       }
       // (b) 備用：搜尋卡片的 from 最低價(只有單一家時的退路)
       if (!fromResult) {
