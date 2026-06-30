@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-06-30T01:40:32.542Z",
+  "scrapeDate": "2026-06-30",
+  "checkin": "06-30",
+  "checkout": "07-01",
+  "dayOfWeek": "週二",
+  "isWeekend": false,
+  "source": "auto-batch",
+  "hotels": {
+    "own": {
+      "agoda": 891,
+      "trip": null,
+      "booking": null
+    },
+    "bchic": {
+      "agoda": 1084,
+      "trip": null,
+      "booking": null
+    },
+    "qiancai": {
+      "agoda": 880,
+      "trip": null,
+      "booking": null
+    },
+    "roumei": {
+      "agoda": 1441,
+      "trip": null,
+      "booking": null
+    },
+    "shemei": {
+      "agoda": 1062,
+      "trip": null,
+      "booking": null
+    },
+    "zhenmei": {
+      "agoda": 1022,
+      "trip": null,
+      "booking": null
+    },
+    "tianjin": {
+      "agoda": 1098,
+      "trip": null,
+      "booking": null
+    },
+    "yunfu": {
+      "agoda": 1298,
+      "trip": null,
+      "booking": null
+    },
+    "apt35": {
+      "agoda": 1119,
+      "trip": null,
+      "booking": null
+    },
+    "napt": {
+      "agoda": 522,
+      "trip": null,
+      "booking": null
+    }
+  }
+}
