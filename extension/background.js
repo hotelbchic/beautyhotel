@@ -372,6 +372,10 @@ function listDates(startISO, endISO) {
 async function runRangeScan(startISO, endISO) {
   if (RUNNING) return;
   RUNNING = true;
+  // 記錄「最後一次跑區間的日期」，給開機補跑機制判斷是否超時
+  chrome.storage.local.get(["bhConfig"], (r) => {
+    const cfg = r.bhConfig || {}; cfg.lastRangeRun = todayISO(); chrome.storage.local.set({ bhConfig: cfg });
+  });
   const dateList = listDates(startISO, endISO);
   const days = {};
   const total = dateList.length * HOTELS.length;
@@ -496,7 +500,23 @@ chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "bhRangeScan") runRangeScan14(); // 自動抓 14 天日曆 + 推雲端
 });
 function setupAllAlarms() { setupDailyAlarm(); setupRangeAlarm(); }
-chrome.runtime.onStartup.addListener(setupAllAlarms);
+
+// 開機補跑：半夜 03:00 沒開機而錯過時，Chrome 一開就補抓(延遲 90 秒避免拖慢開機)
+function daysBetweenISO(a, b) {
+  const [ay, am, ad] = a.split("-").map(Number), [by, bm, bd] = b.split("-").map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+function maybeCatchUpRange() {
+  chrome.storage.local.get(["bhConfig"], (r) => {
+    const cfg = r.bhConfig || {};
+    if (!cfg.rangeScheduleEnabled) return;
+    const days = (typeof cfg.rangeScheduleDays === "number" && cfg.rangeScheduleDays > 0) ? cfg.rangeScheduleDays : 3;
+    const overdue = !cfg.lastRangeRun || daysBetweenISO(cfg.lastRangeRun, todayISO()) >= days;
+    if (overdue) setTimeout(() => { if (!RUNNING) runRangeScan14(); }, 90000);
+  });
+}
+function onBrowserStart() { setupAllAlarms(); maybeCatchUpRange(); }
+chrome.runtime.onStartup.addListener(onBrowserStart);
 chrome.runtime.onInstalled.addListener(() => {
   console.log("beautyhotel-sync background ready");
   // 首次安裝/更新時，若還沒設定過排程，給預設值
