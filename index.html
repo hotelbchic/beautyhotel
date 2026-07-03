@@ -336,7 +336,7 @@
 <!-- TAB 3: 14天日曆價格表 -->
 <div class="tab-content" id="tab-calendar">
 <div class="section">
-  <div class="update-notice" style="background:#fff0f0;border-color:#e94560;color:#a02030;">⚠️ <strong>還沒抓真實區間前，這裡是「電腦推算」僅供參考</strong><br><span style="font-weight:normal;font-size:12px;">用擴充右下角「📅 抓日期區間」選一段日期（最多 14 天）抓真實價後，這裡會換成真實資料並轉綠。紅框=峻美自家、橘底=週末，也可直接點格子手動改。</span></div>
+  <div class="update-notice" style="background:#eefaf0;border-color:#27ae60;color:#1e7a40;">✅ <strong>這裡只顯示真實抓到的房價，沒抓到就留白（不推算、不亂猜）</strong><br><span style="font-weight:normal;font-size:12px;">用擴充右下角「📅 抓日期區間」選一段日期（最多 14 天）抓真實價後就會填入。空白＝該日還沒抓、或該日限制續住無法單訂。紅框=峻美自家、橘底=週末，也可直接點格子手動改。</span></div>
   <div class="thirty-table-wrap">
     <div style="overflow-x:auto;">
       <table id="thirtyTable">
@@ -380,18 +380,10 @@ function isWeekend(d){ return d.getDay()===0||d.getDay()===6; }
 function fmtDate(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
 function fmtDay(d){ return ['日','一','二','三','四','五','六'][d.getDay()]; }
 
-// Generate sample 30-day prices with weekend uplift
-function genSample(base, variance=0.1){
-  return dates.map(d=>{
-    const wkup = isWeekend(d) ? 1.2 : 1;
-    const noise = 1 + (Math.random()-0.5)*variance;
-    return base ? Math.round(base * wkup * noise / 50)*50 : null;
-  });
-}
-
+// 14 天價格一律從空白開始，只有擴充抓到的真實值(calendar.json)才會填入。
+// 絕不用亂數/推算填格子 —— 搜尋不到就留空。
 hotels.forEach(h=>{
-  const base = h.agoda ? Math.round((h.agoda+(h.trip||h.agoda)+(h.booking||h.agoda))/3) : null;
-  priceData[h.id] = genSample(base);
+  priceData[h.id] = new Array(14).fill(null);
 });
 
 // Track hidden datasets
