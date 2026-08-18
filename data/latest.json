@@ -1,60 +1,60 @@
 {
   "schemaVersion": 1,
-  "lastUpdated": "2026-08-17T01:40:34.220Z",
-  "scrapeDate": "2026-08-17",
-  "checkin": "08-17",
-  "checkout": "08-18",
-  "dayOfWeek": "週一",
+  "lastUpdated": "2026-08-18T01:33:08.690Z",
+  "scrapeDate": "2026-08-18",
+  "checkin": "08-18",
+  "checkout": "08-19",
+  "dayOfWeek": "週二",
   "isWeekend": false,
   "source": "auto-batch",
   "hotels": {
     "own": {
-      "agoda": 942,
-      "trip": null,
-      "booking": null
+      "agoda": 1039,
+      "trip": 976,
+      "booking": 1238
     },
     "bchic": {
-      "agoda": 1264,
-      "trip": null,
-      "booking": null
+      "agoda": 1311,
+      "trip": 1529,
+      "booking": 1651
     },
     "qiancai": {
-      "agoda": 849,
-      "trip": null,
-      "booking": null
+      "agoda": 863,
+      "trip": 1259,
+      "booking": 981
     },
     "roumei": {
-      "agoda": 1854,
-      "trip": null,
-      "booking": null
+      "agoda": 1945,
+      "trip": 2324,
+      "booking": 2429
     },
     "shemei": {
-      "agoda": 1036,
-      "trip": null,
-      "booking": null
+      "agoda": 985,
+      "trip": 1024,
+      "booking": 1196
     },
     "zhenmei": {
-      "agoda": 898,
-      "trip": null,
-      "booking": null
+      "agoda": 1022,
+      "trip": 961,
+      "booking": 1084
     },
     "tianjin": {
-      "agoda": 1018,
-      "trip": null,
+      "agoda": 2310,
+      "trip": 1855,
       "booking": null
     },
     "yunfu": {
-      "agoda": 2464,
-      "trip": null,
-      "booking": null
+      "agoda": 1557,
+      "trip": 1579,
+      "booking": 1557
     },
     "apt35": {
-      "agoda": 744,
+      "agoda": 759,
       "trip": null,
       "booking": null
     },
     "napt": {
-      "agoda": 630,
+      "agoda": 759,
       "trip": null,
       "booking": null
     }
