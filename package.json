@@ -1,0 +1,13 @@
+{
+  "name": "price-radar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "中山區房價雷達 — 顯示網頁 + 資料存放後端(雲梯)",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  }
+}
