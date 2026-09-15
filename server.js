@@ -17,14 +17,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// 雲梯內網 Postgres 沒開 SSL；用 CLOUDLIFT_API 是否存在判斷是否在雲梯上跑
-const ON_CLOUDLIFT = !!process.env.CLOUDLIFT_API;
+// 雲梯內網 Postgres 沒開 SSL(連 SSL 交握都會被拒)。這個 app 只跑在雲梯上，
+// 所以固定關閉 SSL；真要開可設 PGSSL=1。
 let pool = null;
 function db() {
   if (!pool) {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: ON_CLOUDLIFT ? false : { rejectUnauthorized: false },
+      ssl: process.env.PGSSL === "1" ? { rejectUnauthorized: false } : false,
       max: 4,
     });
   }
