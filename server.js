@@ -70,10 +70,12 @@ app.post("/api/ingest", async (req, res) => {
   }
   try {
     await ensureTable();
+    // 一律 JSON.stringify 再綁定：pg 會把 JS 陣列當成 Postgres 陣列(index.json 是陣列)，
+    // 轉成字串交給 jsonb 欄位才不會出錯。
     await db().query(
-      "INSERT INTO files (path, content, updated_at) VALUES ($1,$2,now()) " +
+      "INSERT INTO files (path, content, updated_at) VALUES ($1,$2::jsonb,now()) " +
       "ON CONFLICT (path) DO UPDATE SET content=EXCLUDED.content, updated_at=now()",
-      [p, content]
+      [p, JSON.stringify(content)]
     );
     res.json({ ok: true, path: p });
   } catch (e) {
