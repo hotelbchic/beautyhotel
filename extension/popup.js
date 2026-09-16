@@ -89,49 +89,32 @@ async function buildSnapshot(checkin) {
   };
 }
 
-// ---- GitHub API：建立/更新一個檔案 ----
-function utf8ToBase64(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-// 讀某路徑現有 JSON 內容 + sha（不存在回 {json:null}）
+// ---- 雲梯後端：讀/寫檔（取代 GitHub API）----
+const CLOUDLIFT_BASE = "https://price-radar.app.saltycloud.ai";
+const INGEST_SECRET = self.BH_INGEST_SECRET || ""; // 來自 secret.js(不進版控)
+function dpath(p) { return String(p).replace(/^data\//, ""); }
 async function ghGetJson(path, cfg) {
-  const base = `https://api.github.com/repos/${cfg.repo}/contents/${path}`;
-  const headers = { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json" };
-  const res = await fetch(`${base}?ref=${encodeURIComponent(cfg.branch)}`, { headers });
-  if (res.status === 404) return { json: null, sha: undefined };
-  if (!res.ok) throw new Error(`讀取 ${path} 失敗：${res.status}`);
-  const j = await res.json();
-  let json = null;
-  try { json = JSON.parse(decodeURIComponent(escape(atob(j.content)))); } catch (e) {}
-  return { json, sha: j.sha };
+  try {
+    const res = await fetch(`${CLOUDLIFT_BASE}/data/${dpath(path)}?t=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) return { json: await res.json(), sha: undefined };
+  } catch (e) {}
+  return { json: null, sha: undefined };
 }
 async function ghPut(path, obj, message, cfg, sha) {
-  const base = `https://api.github.com/repos/${cfg.repo}/contents/${path}`;
-  const headers = { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" };
-  if (sha === undefined) {
-    // 沒傳就自己查一次
-    const cur = await ghGetJson(path, cfg);
-    sha = cur.sha;
-  }
-  const body = { message, content: utf8ToBase64(JSON.stringify(obj, null, 2)), branch: cfg.branch };
-  if (sha) body.sha = sha;
-  const putRes = await fetch(base, { method: "PUT", headers, body: JSON.stringify(body) });
-  if (!putRes.ok) {
-    const txt = await putRes.text();
-    throw new Error(`寫入 ${path} 失敗：${putRes.status} ${txt.slice(0, 120)}`);
-  }
-  return putRes.json();
+  const secret = (cfg && cfg.ingestSecret) || INGEST_SECRET;
+  const res = await fetch(`${CLOUDLIFT_BASE}/api/ingest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-ingest-secret": secret },
+    body: JSON.stringify({ path: dpath(path), content: obj }),
+  });
+  if (!res.ok) throw new Error(`寫入 ${path} 失敗：${res.status} ${(await res.text()).slice(0, 120)}`);
+  return res.json();
 }
 
 // ---- 推送 ----
 async function doPush() {
   const st = $("pushStatus");
   const cfg = await getCfg();
-  if (!cfg.token) {
-    setStatus(st, "❌ 還沒設定 GitHub Token，請展開下方「⚙️ GitHub 推送設定」", "err");
-    $("settings").open = true;
-    return;
-  }
   cfg.repo = cfg.repo || "hotelbchic/beautyhotel";
   cfg.branch = cfg.branch || "main";
 
@@ -156,7 +139,7 @@ async function doPush() {
     list.sort();
     await ghPut("data/history/index.json", list, `data: 更新歷史索引 (${sd})`, cfg, idx.sha);
 
-    setStatus(st, `✅ 推送成功！<br>GitHub Pages 約 30-60 秒後更新，手機開比價表即可看到 ${checkin} 的房價。`, "ok");
+    setStatus(st, `✅ 推送成功！<br>雲梯即時更新，手機開比價表即可看到 ${checkin} 的房價。`, "ok");
   } catch (e) {
     setStatus(st, `❌ ${e.message || e}`, "err");
   } finally {
@@ -164,24 +147,9 @@ async function doPush() {
   }
 }
 
-// ---- 設定存讀 ----
-async function loadCfgToForm() {
-  const cfg = await getCfg();
-  if (cfg.token) $("ghToken").value = cfg.token;
-  $("ghRepo").value = cfg.repo || "hotelbchic/beautyhotel";
-  $("ghBranch").value = cfg.branch || "main";
-}
-function saveCfg() {
-  const cfg = {
-    token: $("ghToken").value.trim(),
-    repo: $("ghRepo").value.trim() || "hotelbchic/beautyhotel",
-    branch: $("ghBranch").value.trim() || "main",
-  };
-  chrome.storage.local.set({ [CFG_KEY]: cfg }, () => {
-    setStatus($("cfgStatus"), "✅ 已儲存", "ok");
-    setTimeout(() => clearStatus($("cfgStatus")), 2500);
-  });
-}
+// ---- 設定存讀（GitHub 設定已移除，資料改存雲梯，保留空函式相容舊呼叫）----
+async function loadCfgToForm() {}
+function saveCfg() {}
 
 // ---- 一鍵全抓 + 推送 ----
 let autoPollTimer = null;
@@ -220,14 +188,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (r.bhAutoStatus) { renderAutoStatus(r.bhAutoStatus); if (r.bhAutoStatus.running) startAutoPoll(); }
   });
 
-  $("open-bh").onclick = () => chrome.tabs.create({ url: "https://hotelbchic.github.io/beautyhotel/" });
+  $("open-bh").onclick = () => chrome.tabs.create({ url: "https://price-radar.app.saltycloud.ai/" });
   $("open-gt").onclick = () => chrome.tabs.create({ url: "https://www.google.com/travel/hotels?hl=zh-TW&gl=tw" });
   $("clear").onclick = () => {
     if (!confirm("確定要清空所有抓取的房價資料？")) return;
     chrome.storage.local.set({ bhScrapes: [] }, render);
   };
   $("push").onclick = doPush;
-  $("saveCfg").onclick = saveCfg;
+  if ($("saveCfg")) $("saveCfg").onclick = saveCfg;
 
   // ---- 每天自動排程 ----
   chrome.storage.local.get(["bhConfig"], (r) => {

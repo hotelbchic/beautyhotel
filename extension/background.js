@@ -204,32 +204,28 @@ async function scrapeOnce(tabId, q, expectedId, ts, wantAll) {
   return d;
 }
 
-// ---- GitHub 推送（service worker 版，與 popup 邏輯一致）----
-function utf8ToBase64(str) {
-  // service worker 沒有 unescape，用 TextEncoder
-  const bytes = new TextEncoder().encode(str);
-  let bin = "";
-  bytes.forEach((b) => (bin += String.fromCharCode(b)));
-  return btoa(bin);
-}
+// ---- 雲梯後端 推送（取代原本的 GitHub 推送）----
+// 資料存到雲梯：讀 GET /data/<path>、寫 POST /api/ingest。保留 ghGetSha/ghPut 的函式名
+// 與簽名，呼叫端(autoPush/runRangeScan)完全不用改。
+const CLOUDLIFT_BASE = "https://price-radar.app.saltycloud.ai";
+// 推送密鑰放在不進版控的 secret.js（避免公開的 GitHub repo 洩漏）
+try { importScripts("secret.js"); } catch (e) {}
+const INGEST_SECRET = self.BH_INGEST_SECRET || "";
+function dpath(p) { return String(p).replace(/^data\//, ""); } // 儲存路徑不含 data/ 前綴
 async function ghGetSha(path, cfg) {
-  const base = `https://api.github.com/repos/${cfg.repo}/contents/${path}`;
-  const headers = { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json" };
-  const res = await fetch(`${base}?ref=${encodeURIComponent(cfg.branch)}`, { headers });
-  if (res.status === 404) return { sha: undefined, json: null };
-  if (!res.ok) throw new Error(`讀取 ${path} 失敗 ${res.status}`);
-  const j = await res.json();
-  let json = null;
-  try { json = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(j.content), (c) => c.charCodeAt(0)))); } catch (e) {}
-  return { sha: j.sha, json };
+  try {
+    const res = await fetch(`${CLOUDLIFT_BASE}/data/${dpath(path)}?t=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) return { sha: undefined, json: await res.json() };
+  } catch (e) {}
+  return { sha: undefined, json: null }; // 沒有就當空(雲梯無 sha 概念)
 }
 async function ghPut(path, obj, message, cfg, sha) {
-  const base = `https://api.github.com/repos/${cfg.repo}/contents/${path}`;
-  const headers = { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" };
-  if (sha === undefined) sha = (await ghGetSha(path, cfg)).sha;
-  const body = { message, content: utf8ToBase64(JSON.stringify(obj, null, 2)), branch: cfg.branch };
-  if (sha) body.sha = sha;
-  const res = await fetch(base, { method: "PUT", headers, body: JSON.stringify(body) });
+  const secret = (cfg && cfg.ingestSecret) || INGEST_SECRET;
+  const res = await fetch(`${CLOUDLIFT_BASE}/api/ingest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-ingest-secret": secret },
+    body: JSON.stringify({ path: dpath(path), content: obj }),
+  });
   if (!res.ok) throw new Error(`寫入 ${path} 失敗 ${res.status} ${(await res.text()).slice(0, 100)}`);
   return res.json();
 }
@@ -261,9 +257,7 @@ function buildSnapshot(checkin, scrapes) {
 
 async function autoPush(preferredCheckin) {
   const cfg = await getCfg();
-  if (!cfg.token) return { ok: false, reason: "沒設定 GitHub Token，已抓到的資料留在擴充裡，可手動推送" };
-  cfg.repo = cfg.repo || "hotelbchic/beautyhotel";
-  cfg.branch = cfg.branch || "main";
+  // 雲梯後端不需要 GitHub Token，推送密鑰內建，直接推
   const scrapes = await getScrapes();
   let checkin;
   // 若呼叫端指定了入住日（如每日排程＝今天），就用它，避免被舊的區間資料蓋過
@@ -318,7 +312,7 @@ async function runAutoBatch() {
       await sleep(5000); // 人類節奏間隔，降低被擋
     }
     // 自動推送
-    await setStatus({ running: true, i: HOTELS.length, total: HOTELS.length, msg: "推送到 GitHub…", ok: ok.length, skip: skip.length, ts: Date.now() });
+    await setStatus({ running: true, i: HOTELS.length, total: HOTELS.length, msg: "推送到雲梯…", ok: ok.length, skip: skip.length, ts: Date.now() });
     let pushMsg;
     try {
       // 明確指定「今天入住」當這份快照的日期，避免被舊的區間掃描資料蓋過
@@ -400,13 +394,11 @@ async function runRangeScan(startISO, endISO) {
         await sleep(5000);
       }
     }
-    await setStatus({ running: true, i: total, total, msg: "推送區間房價到 GitHub…", ok: okCount });
+    await setStatus({ running: true, i: total, total, msg: "推送區間房價到雲梯…", ok: okCount });
     let pushMsg;
     try {
       const cfg = await getCfg();
-      if (!cfg.token) pushMsg = "未推送：沒設 GitHub Token";
-      else {
-        cfg.repo = cfg.repo || "hotelbchic/beautyhotel"; cfg.branch = cfg.branch || "main";
+      {
         // 合併：先讀雲端現有的 days，把這次的疊上去(不覆蓋掉之前抓的其他日期)
         let mergedDays = {};
         try {

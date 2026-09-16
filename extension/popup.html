@@ -84,7 +84,7 @@
   <label for="pushDate">發布哪個入住日期為「最新」</label>
   <select id="pushDate"></select>
   <div id="pushStatus" class="status"></div>
-  <button id="push">📤 推送到 GitHub（手機也看得到）</button>
+  <button id="push">📤 推送到雲梯（手機也看得到）</button>
 
   <hr>
 
@@ -94,26 +94,19 @@
 
   <!-- 設定 -->
   <details id="settings">
-    <summary>⚙️ GitHub 推送設定</summary>
-    <label for="ghToken">GitHub Token (Fine-grained PAT)</label>
-    <input type="password" id="ghToken" placeholder="github_pat_..." autocomplete="off">
+    <summary>⚙️ 資料儲存位置</summary>
     <div class="hint">
-      只授權 <b>hotelbchic/beautyhotel</b> 一個 repo 的 <b>Contents: Read and write</b>，建議設 90 天到期。<br>
-      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">→ 建立 Fine-grained Token</a><br>
-      Token 只存在你這台電腦的瀏覽器，不會外傳。
+      資料現在存在公司平台（雲梯）：<br>
+      <b>price-radar.app.saltycloud.ai</b><br>
+      推送密鑰已內建，不用設定任何東西。
     </div>
-    <label for="ghRepo">Repo</label>
-    <input type="text" id="ghRepo" value="hotelbchic/beautyhotel">
-    <label for="ghBranch">Branch</label>
-    <input type="text" id="ghBranch" value="main">
-    <button id="saveCfg" class="secondary" style="margin-top:10px;">💾 儲存設定</button>
-    <div id="cfgStatus" class="status"></div>
   </details>
 
   <div class="footer">
-    在 Google Travel 點「📥📥 批次抓全部」收集 → 回這裡「📤 推送到 GitHub」→ 手機開比價表就自動更新。
+    在 Google Travel 點「📥📥 批次抓全部」收集 → 回這裡「📤 推送到雲梯」→ 手機開比價表就自動更新。
   </div>
 
+<script src="secret.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>
