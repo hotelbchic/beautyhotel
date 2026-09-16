@@ -151,6 +151,62 @@ async function doPush() {
 async function loadCfgToForm() {}
 function saveCfg() {}
 
+// ---- 補推歷史：把擴充本機存的每一天資料，一次補推到雲梯 ----
+function _snapMeta(mmdd, year) {
+  let checkout = null, dayOfWeek = "", isWeekend = false;
+  const m = mmdd.match(/(\d{2})-(\d{2})/);
+  if (m) {
+    const ci = new Date(year, +m[1] - 1, +m[2]);
+    const co = new Date(ci.getTime() + 86400000);
+    checkout = `${String(co.getMonth() + 1).padStart(2, "0")}-${String(co.getDate()).padStart(2, "0")}`;
+    dayOfWeek = ["週日","週一","週二","週三","週四","週五","週六"][ci.getDay()];
+    isWeekend = ci.getDay() === 5 || ci.getDay() === 6;
+  }
+  return { checkout, dayOfWeek, isWeekend };
+}
+async function recoverHistory() {
+  const st = $("pushStatus");
+  const arr = await getScrapes();
+  const today = new Date().toISOString().slice(0, 10);
+  const year = new Date().getFullYear();
+  // 依入住日分組（本機每個 hotel@日期 只留最新一筆）
+  const byDate = {};
+  arr.forEach((e) => {
+    if (!e.checkin) return;
+    const iso = `${year}-${e.checkin}`;
+    if (iso > today) return; // 未來日期不當歷史
+    (byDate[e.checkin] = byDate[e.checkin] || []).push(e);
+  });
+  const dates = Object.keys(byDate).sort();
+  if (!dates.length) { setStatus(st, "沒有可補推的資料", "err"); return; }
+  $("recover").disabled = true;
+  let ok = 0; const idxDates = [];
+  for (let i = 0; i < dates.length; i++) {
+    const mmdd = dates[i];
+    setStatus(st, `⏳ 補推 ${i + 1}/${dates.length}：${year}-${mmdd} …`, "info");
+    const hotels = {};
+    ALL_IDS.forEach((id) => { hotels[id] = { agoda: null, trip: null, booking: null }; });
+    byDate[mmdd].forEach((e) => {
+      hotels[e.hotelId] = { agoda: e.prices.agoda ?? null, trip: e.prices.trip ?? null, booking: e.prices.booking ?? null };
+    });
+    const meta = _snapMeta(mmdd, year);
+    const scrapeDate = `${year}-${mmdd}`;
+    const snap = { schemaVersion: 1, lastUpdated: new Date().toISOString(), scrapeDate, checkin: mmdd,
+      checkout: meta.checkout, dayOfWeek: meta.dayOfWeek, isWeekend: meta.isWeekend, source: "recovered", hotels };
+    try { await ghPut(`data/history/${scrapeDate}.json`, snap, `recover ${scrapeDate}`, {}); idxDates.push(scrapeDate); ok++; }
+    catch (e) { /* 個別失敗略過，繼續補 */ }
+  }
+  // 合併歷史索引
+  try {
+    const idx = await ghGetJson("data/history/index.json", {});
+    const existing = Array.isArray(idx.json) ? idx.json : [];
+    const merged = Array.from(new Set(existing.concat(idxDates))).sort();
+    await ghPut("data/history/index.json", merged, "recover index", {});
+  } catch (e) {}
+  $("recover").disabled = false;
+  setStatus(st, `✅ 補推完成！共補 ${ok} 天到雲梯。到比價表看「歷史趨勢／調閱歷史價格」就有 7～9 月了。`, "ok");
+}
+
 // ---- 一鍵全抓 + 推送 ----
 let autoPollTimer = null;
 function renderAutoStatus(s) {
@@ -195,6 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.set({ bhScrapes: [] }, render);
   };
   $("push").onclick = doPush;
+  if ($("recover")) $("recover").onclick = recoverHistory;
   if ($("saveCfg")) $("saveCfg").onclick = saveCfg;
 
   // ---- 每天自動排程 ----
